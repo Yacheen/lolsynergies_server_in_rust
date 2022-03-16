@@ -1,65 +1,77 @@
+//serde and env var stuff
 use dotenv::dotenv;
-use serde::Serialize;
-use std::collections::HashMap;
 use std::env;
 use std::io;
-use std::iter::Map;
 use serde::Deserialize;
 use reqwest;
 
-#[derive(Deserialize, Debug)]
-struct Summoner {
-  puuid: String, 
-}
 
-#[derive(Deserialize, Debug, Serialize)]
-struct Game {
-  metadata: HashMap<String, Vec<String>>,
-  info: HashMap<String, Vec<String>>,
-  dataVersion: String
-}
+//actix web
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, cookie::Cookie};
 
-#[derive(Deserialize, Debug, Serialize)]
-struct MatchIds (String);
+
+#[derive(Deserialize)] struct Summoner { puuid: String }
+#[derive(Deserialize)] struct MatchIds (String);
+//begin pepega json deserialization:
+#[derive(Deserialize)] struct Game { info: GameInfo }
+#[derive(Deserialize)] struct GameInfo {participants: Vec<Participant>}
+#[derive(Deserialize, Debug)] struct Participant {championName: String, summonerName: String, win: bool}
 //structs for sequence of requesting someones info
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+
+#[get("/")]
+async fn hello() -> impl Responder {
+  HttpResponse::Ok().body("Hewwo wowld!")
+}
+
+#[post("/echo")]
+async fn echo(req_body: String) -> impl Responder {
+  let user_cookie = Cookie::new("Authi", &req_body);
+  HttpResponse::Ok().cookie(user_cookie);
+  HttpResponse::Ok().body(req_body)
+}
+
+async fn manual_hello() -> impl Responder {
+  HttpResponse::Ok().body("I manually did this smiley face :)")
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    
     //set env vars
-    dotenv().ok();
-    let api_key = env::var("API_KEY").unwrap();
-    // take input for querying api
-    let mut username = String::new();
-    println!("Please enter a username to find...");
+    //dotenv().ok();
+    //let api_key = env::var("API_KEY").unwrap();
+    HttpServer::new(|| {
+      App::new()
+          .service(hello)
+          .service(echo)
+          .route("/hey",web::get().to(manual_hello))
+    })
+    .bind(("127.0.0.1", 8080))?
+    .run()
+    .await
+   
+    // // take input for querying api
+    // let mut username = String::new();
+    // println!("Please enter a username to find...");
 
-    io::stdin().read_line(&mut username)?;
+    // io::stdin().read_line(&mut username)?;
 
     
-    let url = format!("https://na1.api.riotgames.com/lol/summoner/v4/summoners/by-name/{}?api_key={}", username, api_key);
-    //get puuid
-    //let summoner = 
-    let summoner =  reqwest::get(url).await?.json::<Summoner>().await?;
-    println!("{:#?}", summoner);
+    // let url = format!("https://na1.api.riotgames.com/lol/summoner/v4/summoners/by-name/{}?api_key={}", username, api_key);
+    // //get puuid
+    // let summoner =  reqwest::get(url).await?.json::<Summoner>().await?;
 
-    let matches_url = format!("https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}", summoner.puuid, api_key);
-    //get match ids by puuid
-    //declare vec that derives deserialize & debug struct
+    // let matches_url = format!("https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}", summoner.puuid, api_key);
+    // //get match ids by puuid
+    // let match_ids = reqwest::get(matches_url).await?.json::<Vec<MatchIds>>().await?;
 
-    let match_ids = reqwest::get(matches_url).await?.json::<Vec<MatchIds>>().await?;
-    for match_id in match_ids.iter() {
-      //game.0 is from a struct tuple, so uhh game.0 i guess..
-      println!("{:#?}", match_id.0);
-      let match_url = format!("https://americas.api.riotgames.com/lol/match/v5/matches/{}?api_key={}", match_id.0, api_key);
-      let game = reqwest::get(match_url).await?.json::<Game>().await?;
-      println!("{:?}", game);
-    }
-    //println!("{:#?}", match_ids);
-    
-    // for item in match_ids {
-    //     println!("made it here: {:#?}", match_ids);   
+    // //for each match id, get match participants name, champ, and if they won (max of 3 matches)
+    // for (index, match_id) in match_ids.iter().enumerate() {
+    //   if index == 2 {break}
+    //   let match_url = format!("https://americas.api.riotgames.com/lol/match/v5/matches/{}?api_key={}", match_id.0, api_key);
+    //   let game = reqwest::get(match_url).await?.json::<Game>().await?;
+    //   println!("{:#?}", game.info.participants);
     // }
-    
 
-  //  println!("{:?}", json);
-    Ok(())
-
+   // Ok(())
 }
