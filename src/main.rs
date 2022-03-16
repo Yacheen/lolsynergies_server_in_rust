@@ -21,22 +21,7 @@ struct Summoner {
 
 }
 #[derive(Deserialize, Debug)]
-struct MatchIds {
-    matchId: String
-}
-
-impl Iterator for MatchIds {
-    type Item = String;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.matchId.len() == 0 {
-            None
-        }
-        else {
-            Some(self.matchId)
-        }
-    }
-}
+struct MatchIds;
 
 
 #[tokio::main]
@@ -58,9 +43,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let matches_url = format!("https://na1.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}", summoner.puuid, api_key);
     //get match ids by puuid
-    let mut match_ids = reqwest::get(matches_url).await?.json::<MatchIds>().await?.next().filter(|game| game.len() > 0);
+    let mut match_ids = reqwest::get(matches_url).await?.json::<MatchIds>().await?;
 
-    println!("{:#?}", match_ids);
+    for (i, &item) in match_ids. {
+        println!("{:#?}", match_ids);
+    }
 
   //  println!("{:?}", json);
     Ok(())
