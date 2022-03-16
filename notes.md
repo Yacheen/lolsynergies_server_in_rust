@@ -1,0 +1,2 @@
+Zeychin: A BTreeMap<Key, struct{wins,losses}> with a comparator evaluating the absolute ordering over the map as a.wins - a-losses > b.wins > b.losses may be a better choice of data structuring.
+Zeychin: a.losses* I can't read.
