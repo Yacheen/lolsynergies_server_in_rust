@@ -7,7 +7,7 @@ use reqwest;
 
 
 //actix web
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, cookie::Cookie};
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, cookie::Cookie, HttpRequest, HttpMessage, http::StatusCode};
 
 
 #[derive(Deserialize)] struct Summoner { puuid: String }
@@ -25,8 +25,14 @@ async fn hello() -> impl Responder {
 
 #[post("/echo")]
 async fn echo(req_body: String) -> impl Responder {
-  let user_cookie = Cookie::new("Authi", &req_body);
-  HttpResponse::Ok().cookie(user_cookie);
+  let code = StatusCode::OK;
+  let cookie = Cookie::new("authi", &req_body);
+  println!("{}", cookie);
+  match HttpResponse::add_cookie(&mut HttpResponse::new(code), &cookie) {
+    Ok(val) => val,
+    Err(_) => println!("err")
+  };
+  
   HttpResponse::Ok().body(req_body)
 }
 
