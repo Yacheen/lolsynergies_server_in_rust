@@ -1,13 +1,14 @@
-use actix_web::{HttpResponseBuilder};
+
 //serde and env var stuff
 use dotenv::dotenv;
 use std::env;
+use std::sync::Mutex;
 use serde::Deserialize; 
 use reqwest;
 
 
 //actix web
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, cookie::Cookie, http::StatusCode};
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, cookie::Cookie, http::StatusCode, HttpResponseBuilder};
 
 
 #[derive(Deserialize)]
@@ -53,7 +54,6 @@ async fn hello() -> impl Responder {
 async fn echo(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Responder {
   //i guess do redis stuff here regarding timeouts when u can refresh data
   
-
   dotenv().ok();
   let api_key = env::var("API_KEY").unwrap();
 
@@ -70,14 +70,13 @@ async fn echo(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Responder
   let cookie = Cookie::new("username", &synergiespostdata.0.username);
 
   //foreach match_id, request
-  let mut match_data: Vec<SummonerYouPlayedWithInfo> = Vec::new();
+  //let mut match_data: Vec<SummonerYouPlayedWithInfo> = Vec::new();
   for (index, match_id) in match_ids.iter().enumerate() {
     if index == 2 {break}
     let match_url = format!("https://americas.api.riotgames.com/lol/match/v5/matches/{}?api_key={}", match_id.0, api_key);
     let game = reqwest::get(match_url).await.unwrap().json::<Game>().await.unwrap();
-    //add each game to a list and edit an array to havecertain values based on participant
     
-    //initizalize SummonerYouPlayedWith
+    //initizalize SummonerYouPlayedWith if they're not already in summoneryouplayedwith[]
     let champions_info = ChampionsInfo::new(
     game.info.participants.get(index).unwrap().championName.to_string(),
     if game.info.participants.get(index).unwrap().win == true {1} else {0},
@@ -100,17 +99,16 @@ async fn echo(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Responder
   return res
 }
 
-async fn manual_hello() -> impl Responder {
-  HttpResponse::Ok().body("I manually did this smiley face :)")
-}
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
-    
+pub async fn main() -> std::io::Result<()> {
+    let match_data: Vec<SummonerYouPlayedWithInfo> = Vec::new();
+    let mut data = web::Data::new(Mutex::new(match_data));
 
 
     HttpServer::new(|| {
       App::new()
+          .app_data(data.clone())
           .service(hello)
           .service(echo)
           .route("/hey",web::get().to(manual_hello))
