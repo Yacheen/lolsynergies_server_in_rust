@@ -8,7 +8,7 @@ use reqwest;
 
 
 //actix web
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, cookie::Cookie, http::StatusCode, HttpResponseBuilder};
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, cookie::Cookie, http::StatusCode, HttpResponseBuilder, body::MessageBody};
 
 
 #[derive(Deserialize)]
@@ -24,6 +24,9 @@ struct SynergiesPostBody {
 #[derive(Deserialize)] struct Participant {championName: String, summonerName: String, win: bool}
 
 //then put data into array of SummonersYouPLayedWith
+struct AppData {
+  summoners_you_played_with: Mutex<Vec<SummonerYouPlayedWithInfo>>  
+}
 struct SummonerYouPlayedWithInfo { summonerName: String, champions: ChampionsInfo }
 impl SummonerYouPlayedWithInfo {
   fn new(summonerName: String, champions: ChampionsInfo) -> SummonerYouPlayedWithInfo{
@@ -51,9 +54,9 @@ async fn hello() -> impl Responder {
 }
 
 #[post("/api/synergies")]
-async fn echo(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Responder {
+async fn echo(synergiespostdata: web::Json<SynergiesPostBody>, data: web::Data<AppData>) -> impl Responder {
   //i guess do redis stuff here regarding timeouts when u can refresh data
-  
+  let mut match_data = data.summoners_you_played_with.lock().unwrap();
   dotenv().ok();
   let api_key = env::var("API_KEY").unwrap();
 
@@ -87,31 +90,29 @@ async fn echo(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Responder
       game.info.participants.get(index).unwrap().summonerName.clone(),
        champions_info
     );
-
     match_data.push(summoner_you_played_with);
     //println!("{:#?}", game.info.participants.get(0..).unwrap());
   }
 
-  
   let res = HttpResponseBuilder::new(StatusCode::OK)
       .cookie(cookie)
-      .body(synergiespostdata.0.username);
+      .body(match_data);
   return res
 }
 
 
 #[actix_web::main]
 pub async fn main() -> std::io::Result<()> {
-    let match_data: Vec<SummonerYouPlayedWithInfo> = Vec::new();
-    let mut data = web::Data::new(Mutex::new(match_data));
+    let match_data = web::Data::new(AppData {
+      summoners_you_played_with: Mutex::new(Vec::new()),
+    });
 
 
-    HttpServer::new(|| {
+    HttpServer::new(move || {
       App::new()
-          .app_data(data.clone())
+          .app_data(match_data.clone())
           .service(hello)
           .service(echo)
-          .route("/hey",web::get().to(manual_hello))
     })
     .bind(("127.0.0.1", 8080))?
     .run()
