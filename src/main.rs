@@ -1,14 +1,14 @@
 
 //serde and env var stuff
+use std::sync::Mutex;
 use dotenv::dotenv;
 use std::env;
-use std::sync::Mutex;
 use serde::Deserialize; 
 use reqwest;
 
 
 //actix web
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, cookie::Cookie, http::StatusCode, HttpResponseBuilder, body::MessageBody};
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, cookie::Cookie, http::StatusCode, HttpResponseBuilder};
 
 
 #[derive(Deserialize)]
@@ -24,9 +24,11 @@ struct SynergiesPostBody {
 #[derive(Deserialize)] struct Participant {championName: String, summonerName: String, win: bool}
 
 //then put data into array of SummonersYouPLayedWith
+
 struct AppData {
-  summoners_you_played_with: Mutex<Vec<SummonerYouPlayedWithInfo>>  
+  summoners_you_played_with: Mutex<Vec<SummonerYouPlayedWithInfo>> // <- Mutex is necessary to mutate safely across threads
 }
+
 struct SummonerYouPlayedWithInfo { summonerName: String, champions: ChampionsInfo }
 impl SummonerYouPlayedWithInfo {
   fn new(summonerName: String, champions: ChampionsInfo) -> SummonerYouPlayedWithInfo{
@@ -48,15 +50,16 @@ impl ChampionsInfo {
   }
 }
 
+
 #[get("/")]
 async fn hello() -> impl Responder {
   HttpResponse::Ok().body("Hewwo wowld!")
 }
 
 #[post("/api/synergies")]
-async fn echo(synergiespostdata: web::Json<SynergiesPostBody>, data: web::Data<AppData>) -> impl Responder {
-  //i guess do redis stuff here regarding timeouts when u can refresh data
-  let mut match_data = data.summoners_you_played_with.lock().unwrap();
+async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>, data: web::Data<AppData>) -> impl Responder {
+
+  let mut match_data = data.summoners_you_played_with.lock().unwrap(); // <- get list's MutexGuard
   dotenv().ok();
   let api_key = env::var("API_KEY").unwrap();
 
@@ -90,14 +93,13 @@ async fn echo(synergiespostdata: web::Json<SynergiesPostBody>, data: web::Data<A
       game.info.participants.get(index).unwrap().summonerName.clone(),
        champions_info
     );
-    match_data.push(summoner_you_played_with);
-    //println!("{:#?}", game.info.participants.get(0..).unwrap());
+    match_data.push(summoner_you_played_with); 
+
   }
 
-  let res = HttpResponseBuilder::new(StatusCode::OK)
-      .cookie(cookie)
-      .body(match_data);
-  return res
+  HttpResponseBuilder::new(StatusCode::OK)
+  .cookie(cookie)
+  .body(match_data)
 }
 
 
@@ -112,7 +114,7 @@ pub async fn main() -> std::io::Result<()> {
       App::new()
           .app_data(match_data.clone())
           .service(hello)
-          .service(echo)
+          .service(synergies)
     })
     .bind(("127.0.0.1", 8080))?
     .run()
