@@ -16,7 +16,7 @@ struct SynergiesPostBody {
   username: String
 }
 #[derive(Deserialize)] struct Summoner { puuid: String }
-#[derive(Deserialize)] struct MatchIds (String);
+#[derive(Deserialize, Debug)] struct MatchIds (String);
 //begin pepega json deserialization:
 //structs for sequence of requesting someones info
 #[derive(Deserialize)] struct Game { info: GameInfo }
@@ -28,7 +28,7 @@ struct SynergiesPostBody {
 struct AppData {
   summoners_you_played_with: Mutex<Vec<SummonerYouPlayedWithInfo>> // <- Mutex is necessary to mutate safely across threads
 }
-
+#[derive(Debug)]
 struct SummonerYouPlayedWithInfo { summonerName: String, champions: ChampionsInfo }
 impl SummonerYouPlayedWithInfo {
   fn new(summonerName: String, champions: ChampionsInfo) -> SummonerYouPlayedWithInfo{
@@ -38,7 +38,7 @@ impl SummonerYouPlayedWithInfo {
     }
   }
 }
-
+#[derive(Debug)]
 struct ChampionsInfo { championName: String, wins: u8, losses: u8 }
 impl ChampionsInfo {
   fn new(championName: String, wins: u8, losses: u8) -> ChampionsInfo {
@@ -58,9 +58,8 @@ async fn hello() -> impl Responder {
 
 #[post("/api/synergies")]
 async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>, data: web::Data<AppData>) -> impl Responder {
-
-  let mut match_data = data.summoners_you_played_with.lock().await; 
-  // <- get list's MutexGuard
+  let mut data: Vec<SummonerYouPlayedWithInfo> = Vec::new();
+  //let mut match_data = data.summoners_you_played_with.lock().await; <- get list's MutexGuard
   dotenv().ok();
   let api_key = env::var("API_KEY").unwrap();
 
@@ -72,14 +71,14 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>, data: web::D
 //get match ids by puuid
   let matches_url = format!("https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}", summoner.puuid, api_key);
   let match_ids = reqwest::get(matches_url).await.unwrap().json::<Vec<MatchIds>>().await.unwrap();
-
+println!("{:#?}", match_ids);
   //change this to a special cookie with cookiebuilder
   let cookie = Cookie::new("username", &synergiespostdata.0.username);
 
   //foreach match_id, request
   //let mut match_data: Vec<SummonerYouPlayedWithInfo> = Vec::new();
   for (index, match_id) in match_ids.iter().enumerate() {
-    if index == 2 {break}
+    if index == 4 {break}
     let match_url = format!("https://americas.api.riotgames.com/lol/match/v5/matches/{}?api_key={}", match_id.0, api_key);
     let game = reqwest::get(match_url).await.unwrap().json::<Game>().await.unwrap();
     
@@ -94,13 +93,13 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>, data: web::D
       game.info.participants.get(index).unwrap().summonerName.clone(),
        champions_info
     );
-   // match_data.push(summoner_you_played_with); 
+   cancer.push(summoner_you_played_with); 
 
   }
-
+  println!("{:#?}", cancer);
   HttpResponseBuilder::new(StatusCode::OK)
   .cookie(cookie)
-  .body(String::from("test"))
+  .body(String::from("hi"))
 
 }
 
