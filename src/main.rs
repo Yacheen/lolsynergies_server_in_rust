@@ -1,6 +1,6 @@
 
 //serde and env var stuff
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 use dotenv::dotenv;
 use std::env;
 use serde::Deserialize; 
@@ -59,7 +59,8 @@ async fn hello() -> impl Responder {
 #[post("/api/synergies")]
 async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>, data: web::Data<AppData>) -> impl Responder {
 
-  let mut match_data = data.summoners_you_played_with.lock().unwrap(); // <- get list's MutexGuard
+  let mut match_data = data.summoners_you_played_with.lock().await; 
+  // <- get list's MutexGuard
   dotenv().ok();
   let api_key = env::var("API_KEY").unwrap();
 
@@ -93,18 +94,19 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>, data: web::D
       game.info.participants.get(index).unwrap().summonerName.clone(),
        champions_info
     );
-    match_data.push(summoner_you_played_with); 
+   // match_data.push(summoner_you_played_with); 
 
   }
 
   HttpResponseBuilder::new(StatusCode::OK)
   .cookie(cookie)
-  .body(match_data)
+  .body(String::from("test"))
+
 }
 
 
 #[actix_web::main]
-pub async fn main() -> std::io::Result<()> {
+async fn main() -> std::io::Result<()> {
     let match_data = web::Data::new(AppData {
       summoners_you_played_with: Mutex::new(Vec::new()),
     });
