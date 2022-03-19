@@ -15,7 +15,7 @@ struct SynergiesPostBody {
   username: String
 }
 #[derive(Deserialize)] struct Summoner { puuid: String }
-#[derive(Deserialize)] struct MatchIds (String);
+#[derive(Deserialize, Debug)] struct MatchIds (String);
 //begin pepega json deserialization:
 //structs for sequence of requesting someones info
 #[derive(Deserialize)] struct Game { info: GameInfo }
@@ -70,7 +70,7 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Resp
 //get match ids by puuid
   let matches_url = format!("https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}&count=25", summoner.puuid, api_key);
   let match_ids = reqwest::get(matches_url).await.unwrap().json::<Vec<MatchIds>>().await.unwrap();
-
+println!("{:#?}", match_ids);
   //change this to a special cookie with cookiebuilder
   let cookie = Cookie::new("username", &synergiespostdata.0.username);
 
