@@ -68,46 +68,42 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Resp
   let summoner =  reqwest::get(url).await.unwrap().json::<Summoner>().await.unwrap();
 
 //get match ids by puuid
-  let matches_url = format!("https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}&count=25", summoner.puuid, api_key);
+  let matches_url = format!("https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}&count=31", summoner.puuid, api_key);
   let match_ids = reqwest::get(matches_url).await.unwrap().json::<Vec<MatchIds>>().await.unwrap();
 println!("{:#?}", match_ids);
   //change this to a special cookie with cookiebuilder
-  let cookie = Cookie::new("username", &synergiespostdata.0.username);
+  //let cookie = Cookie::new("username", &synergiespostdata.0.username);
 
   //foreach match_id, request
   let mut match_data: Vec<SummonerYouPlayedWithInfo> = Vec::new();
   for (index, match_id) in match_ids.iter().enumerate() {
-    if index == 25 {break}
+    if index == 30 {break}
     let match_url = format!("https://americas.api.riotgames.com/lol/match/v5/matches/{}?api_key={}", match_id.0, api_key);
     let game = reqwest::get(match_url).await.unwrap().json::<Game>().await.unwrap();
     
     //initizalize SummonerYouPlayedWith if they're not already in summoneryouplayedwith[]
     //gothrough match_data to find summoner
+    for (j, person) in game.info.participants.iter().enumerate() {
+      let champions_info = ChampionsInfo::new(
+        person.championName.to_string(),
+        if person.win == true {1} else {0},
+        if person.win == true {0} else {1}
+         );
+    
+        let summoner_you_played_with = SummonerYouPlayedWithInfo::new(
+          person.summonerName.clone(),
+           champions_info
+        );
 
-    let champions_info = ChampionsInfo::new(
-    game.info.participants.get(index).unwrap().championName.to_string(),
-    if game.info.participants.get(index).unwrap().win == true {1} else {0},
-    if game.info.participants.get(index).unwrap().win == true {0} else {1}
-     );
-
-    let summoner_you_played_with = SummonerYouPlayedWithInfo::new(
-      game.info.participants.get(index).unwrap().summonerName.clone(),
-       champions_info
-    );
-    // go through list, if list.summonername = current, go into it
-    let mut iter = match_data.iter().filter(|name|
-       name.summonerName == game.info.participants.get(index).unwrap().summonerName
-    );
-
+        match_data.push(summoner_you_played_with); 
+    }
+    // let mut iter = match_data.iter().filter(|name|
+    //    name.summonerName == game.info.participants.get(index).unwrap().summonerName
+    // );
     //how do i properly do this .filter()?
-
-
-    match_data.push(summoner_you_played_with); 
-
   }
 
   web::Json(match_data)
-
 }
 
 
