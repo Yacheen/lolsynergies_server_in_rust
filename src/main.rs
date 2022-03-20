@@ -94,6 +94,14 @@ println!("{:#?}", match_ids);
       game.info.participants.get(index).unwrap().summonerName.clone(),
        champions_info
     );
+    // go through list, if list.summonername = current, go into it
+    let mut iter = match_data.iter().filter(|name|
+       name.summonerName == game.info.participants.get(index).unwrap().summonerName
+    );
+
+    //how do i properly do this .filter()?
+
+
     match_data.push(summoner_you_played_with); 
 
   }
