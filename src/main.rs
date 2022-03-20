@@ -7,7 +7,7 @@ use reqwest;
 
 
 //actix web
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, cookie::Cookie, http::StatusCode, HttpResponseBuilder};
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 
 
 #[derive(Deserialize)]
@@ -23,21 +23,21 @@ struct SynergiesPostBody {
 #[derive(Deserialize)] struct Participant {championName: String, summonerName: String, win: bool}
 
 //then put data into array of SummonersYouPLayedWith
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct AppData {
   summoners_you_played_with: Vec<SummonerYouPlayedWithInfo> // <- Mutex is necessary to mutate safely across threads
 }
-#[derive(Serialize)]
-struct SummonerYouPlayedWithInfo { summonerName: String, champions: ChampionsInfo }
+#[derive(Serialize, Debug)]
+struct SummonerYouPlayedWithInfo { summonerName: String, champions: Vec<ChampionsInfo> }
 impl SummonerYouPlayedWithInfo {
-  fn new(summonerName: String, champions: ChampionsInfo) -> SummonerYouPlayedWithInfo{
+  fn new(summonerName: String, champions: Vec<ChampionsInfo>) -> SummonerYouPlayedWithInfo {
     SummonerYouPlayedWithInfo {
       summonerName,
       champions
     }
   }
 }
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct ChampionsInfo { championName: String, wins: u8, losses: u8 }
 impl ChampionsInfo {
   fn new(championName: String, wins: u8, losses: u8) -> ChampionsInfo {
@@ -70,37 +70,42 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Resp
 //get match ids by puuid
   let matches_url = format!("https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}&count=31", summoner.puuid, api_key);
   let match_ids = reqwest::get(matches_url).await.unwrap().json::<Vec<MatchIds>>().await.unwrap();
-println!("{:#?}", match_ids);
   //change this to a special cookie with cookiebuilder
   //let cookie = Cookie::new("username", &synergiespostdata.0.username);
 
   //foreach match_id, request
   let mut match_data: Vec<SummonerYouPlayedWithInfo> = Vec::new();
   for (index, match_id) in match_ids.iter().enumerate() {
-    if index == 30 {break}
+    if index == 20 {break}
     let match_url = format!("https://americas.api.riotgames.com/lol/match/v5/matches/{}?api_key={}", match_id.0, api_key);
     let game = reqwest::get(match_url).await.unwrap().json::<Game>().await.unwrap();
     
-    //initizalize SummonerYouPlayedWith if they're not already in summoneryouplayedwith[]
-    //gothrough match_data to find summoner
+    //go through each person in a game
     for (j, person) in game.info.participants.iter().enumerate() {
-      let champions_info = ChampionsInfo::new(
-        person.championName.to_string(),
-        if person.win == true {1} else {0},
-        if person.win == true {0} else {1}
-         );
-    
-        let summoner_you_played_with = SummonerYouPlayedWithInfo::new(
-          person.summonerName.clone(),
-           champions_info
-        );
 
-        match_data.push(summoner_you_played_with); 
+      
+      //filter through current list of summoners, if found, go throguh their champions
+      if let Some(summ) = match_data.iter_mut().find(|summ| summ.summonerName == person.summonerName) {
+        if let Some(champ) = summ.champions.iter_mut().find(|champ| champ.championName == person.championName) {
+          if let true = person.win {champ.wins += 1} else {champ.losses += 1}
+         } else {
+          summ.champions.push(ChampionsInfo::new(
+            person.championName.to_string(),
+            if person.win == true {1} else {0},
+            if person.win == true {0} else {1}
+          ));
+         }
+      } else {
+        match_data.push(SummonerYouPlayedWithInfo::new(
+          summoner_you_played_with.summonerName,
+          summoner_you_played_with.champions
+          )
+        );
+      }
+        
+
     }
-    // let mut iter = match_data.iter().filter(|name|
-    //    name.summonerName == game.info.participants.get(index).unwrap().summonerName
-    // );
-    //how do i properly do this .filter()?
+  
   }
 
   web::Json(match_data)
