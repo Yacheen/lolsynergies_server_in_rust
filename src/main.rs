@@ -81,10 +81,12 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Resp
     let game = reqwest::get(match_url).await.unwrap().json::<Game>().await.unwrap();
     
     //go through each person in a game
-    for (j, person) in game.info.participants.iter().enumerate() {
-
-      
-      //filter through current list of summoners, if found, go throguh their champions
+    for person in game.info.participants.iter() {
+      //filter through current list of summoners
+      //, if found, go throguh their champions,
+      //   if found, add a win or loss,
+      //  otherwise add a new champ,
+      //otherwise add a new summoner
       if let Some(summ) = match_data.iter_mut().find(|summ| summ.summonerName == person.summonerName) {
         if let Some(champ) = summ.champions.iter_mut().find(|champ| champ.championName == person.championName) {
           if let true = person.win {champ.wins += 1} else {champ.losses += 1}
@@ -96,14 +98,15 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Resp
           ));
          }
       } else {
-        match_data.push(SummonerYouPlayedWithInfo::new(
-          summoner_you_played_with.summonerName,
-          summoner_you_played_with.champions
-          )
-        );
+        //a champ needs to be added as a vector initially. I probably did this in the worst way possible.
+        let mut champ = Vec::new();
+        champ.push(ChampionsInfo::new(
+          person.championName.to_string(),
+          if person.win == true {1} else {0},
+          if person.win == true {0} else {1}
+        ));
+        match_data.push(SummonerYouPlayedWithInfo::new(person.summonerName.clone(),champ));
       }
-        
-
     }
   
   }
