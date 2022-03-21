@@ -2,10 +2,9 @@
 //serde and env var stuff
 use futures::{stream::{self, FusedStream}, StreamExt, join, TryStreamExt, Stream, stream::select_all, AsyncReadExt, future};
 use dotenv::dotenv;
-use std::{env, ops::Add, slice::SliceIndex, error::Error, thread, time::Duration};
-use serde::{Deserialize, Serialize};
+use std::{env, ops::Add, slice::SliceIndex, error::Error};
+use serde::{Deserialize, Serialize}; 
 use reqwest::Client;
-
 
 
 //actix web
@@ -78,12 +77,12 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Resp
   let mut game_urls = Vec::new();
   for item in match_ids.iter() {
     game_urls.push(format!("https://americas.api.riotgames.com/lol/match/v5/matches/{}?api_key={}", item.0, api_key));
-  }
+  } 
 
   const CONCURRENT_REQUESTS: usize = 4;
   let client = Client::new();
-
-  let games = stream::iter(game_urls)
+  
+     let games = stream::iter(game_urls)
       .map(|url| {
         let client = &client;
         async move {
@@ -91,42 +90,40 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Resp
           resp.json::<Game>().await
         }
       })
-      .buffer_unordered(CONCURRENT_REQUESTS);
+      .buffer_unordered(CONCURRENT_REQUESTS)
+      .and_then(|game| {
+        for person in game.info.participants.iter() {
+          //filter through current list of summoners
+          //,   if found, go throguh their champions,
+          //      if found, add a win or loss,
+          //    otherwise add a new champ,
+          //otherwise add a new summoner
+          if let Some(summ) = match_data.iter_mut().find(|summ| summ.summonerName == person.summonerName) {
+            if let Some(champ) = summ.champions.iter_mut().find(|champ| champ.championName == person.championName) {
+              if let true = person.win {champ.wins += 1} else {champ.losses += 1}
+              } else {
+              summ.champions.push(ChampionsInfo::new(
+                person.championName.to_string(),
+                if person.win == true {1} else {0},
+                if person.win == true {0} else {1}
+              ));
+              }
+          } else {
+            //a champ needs to be added as a vector initially. I probably did this in the worst way possible.
+            let mut champ = Vec::new();
+            champ.push(ChampionsInfo::new(
+              person.championName.to_string(),
+              if person.win == true {1} else {0},
+              if person.win == true {0} else {1}
+            ));
+            match_data.push(SummonerYouPlayedWithInfo::new(person.summonerName.clone(),champ));
+          }
+        }
+        future::ok(game)
+      });
 
-  let _computations = games.and_then(|game|{
-    for person in game.info.participants.iter() {
-      //filter through current list of summoners
-      //,   if found, go throguh their champions,
-      //      if found, add a win or loss,
-      //    otherwise add a new champ,
-      //otherwise add a new summoner
-      if let Some(summ) = match_data.iter_mut().find(|summ| summ.summonerName == person.summonerName) {
-        if let Some(champ) = summ.champions.iter_mut().find(|champ| champ.championName == person.championName) {
-          if let true = person.win {champ.wins += 1} else {champ.losses += 1}
-         } else {
-          summ.champions.push(ChampionsInfo::new(
-            person.championName.to_string(),
-            if person.win == true {1} else {0},
-            if person.win == true {0} else {1}
-          ));
-         }
-      } else {
-        //a champ needs to be added as a vector initially. I probably did this in the worst way possible.
-        let mut champ = Vec::new();
-        champ.push(ChampionsInfo::new(
-          person.championName.to_string(),
-          if person.win == true {1} else {0},
-          if person.win == true {0} else {1}
-        ));
-        match_data.push(SummonerYouPlayedWithInfo::new(person.summonerName.clone(),champ));
-      }
-    }
-    
-  });
-
-  
   web::Json(match_data)
-
+  
 }
 
 
