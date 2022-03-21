@@ -83,9 +83,9 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Resp
     //go through each person in a game
     for person in game.info.participants.iter() {
       //filter through current list of summoners
-      //, if found, go throguh their champions,
-      //   if found, add a win or loss,
-      //  otherwise add a new champ,
+      //,   if found, go throguh their champions,
+      //      if found, add a win or loss,
+      //    otherwise add a new champ,
       //otherwise add a new summoner
       if let Some(summ) = match_data.iter_mut().find(|summ| summ.summonerName == person.summonerName) {
         if let Some(champ) = summ.champions.iter_mut().find(|champ| champ.championName == person.championName) {
