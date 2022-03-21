@@ -7,7 +7,8 @@ edition = "2021"
 
 [dependencies]
 reqwest = { version = "0.11", features = ["json"] }
-tokio = { version = "1", feature="sync" }
+tokio = { version = "1", features=["sync", "macros"] }
 dotenv = "0.15.0"
 serde = {version = "1.0.136", features = ["derive"]}
 actix-web = "4"
+futures = "0.3.21"
