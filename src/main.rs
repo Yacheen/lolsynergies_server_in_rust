@@ -1,5 +1,6 @@
 
 //serde and env var stuff
+use std::thread;
 use dotenv::dotenv;
 use std::env;
 use serde::{Deserialize, Serialize}; 
@@ -18,8 +19,11 @@ struct SynergiesPostBody {
 #[derive(Deserialize, Debug)] struct MatchIds (String);
 //begin pepega json deserialization:
 //structs for sequence of requesting someones info
+#[derive(Debug)]
 #[derive(Deserialize)] struct Game { info: GameInfo }
+#[derive(Debug)]
 #[derive(Deserialize)] struct GameInfo {participants: Vec<Participant>}
+#[derive(Debug)]
 #[derive(Deserialize)] struct Participant {championName: String, summonerName: String, win: bool}
 
 //then put data into array of SummonersYouPLayedWith
@@ -75,6 +79,50 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Resp
 
   //foreach match_id, request
   let mut match_data: Vec<SummonerYouPlayedWithInfo> = Vec::new();
+  let mut game_urls = Vec::new();
+  for item in match_ids.iter() {
+    game_urls.push(format!("https://americas.api.riotgames.com/lol/match/v5/matches/{}?api_key={}", item.0, api_key));
+  } 
+  let games_data: Vec<Game> = Vec::new();
+  let requests_batch_1 = tokio::spawn(async move {
+    for elem in game_urls.get(0..4).unwrap().iter() {
+
+    }
+  });
+  let requests_batch_2 = tokio::spawn(async move {
+    for elem in game_urls.get(4..8).unwrap().iter() {
+      
+    }
+  });
+  let requests_batch_1 = tokio::spawn(async move {
+    for elem in game_urls.get(8..12).unwrap().into_iter() {
+      
+    }
+  });
+  let requests_batch_1 = tokio::spawn(async move {
+    for elem in game_urls.get(12..16).unwrap().into_iter() {
+      
+    }
+  });
+  let requests_batch_5 = tokio::spawn(async move {
+    for elem in game_urls.get(16..20).unwrap().into_iter(){
+      
+    }
+  });
+  for (i, url) in game_urls.into_iter().enumerate() {
+    if i % 2 == 0 {
+      let game_request = tokio::spawn( async move {
+        reqwest::get(url).await.unwrap().json::<Game>().await.unwrap()
+      });
+      println!("{:#?}", game_request);
+      
+      
+    }
+    
+  }
+  
+
+
   for (index, match_id) in match_ids.iter().enumerate() {
     if index == 20 {break}
     let match_url = format!("https://americas.api.riotgames.com/lol/match/v5/matches/{}?api_key={}", match_id.0, api_key);
