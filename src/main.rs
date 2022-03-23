@@ -1,14 +1,14 @@
 
 //serde and env var stuff
-use futures::{stream::{self, FusedStream}, StreamExt, join, TryStreamExt, Stream, stream::select_all, AsyncReadExt, future};
+use futures::{stream, StreamExt};
 use dotenv::dotenv;
-use std::{env, ops::Add, slice::SliceIndex, error::Error};
+use std::env;
 use serde::{Deserialize, Serialize}; 
 use reqwest::Client;
 
 
 //actix web
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, http::header::TryIntoHeaderValue};
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 
 
 #[derive(Deserialize)]
