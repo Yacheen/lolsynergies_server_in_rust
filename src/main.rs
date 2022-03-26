@@ -5,8 +5,8 @@ use dotenv::dotenv;
 use std::env;
 use serde::{Deserialize, Serialize}; 
 use reqwest::Client;
-
-
+use actix_cors::Cors;
+use redis::{Commands, aio::MultiplexedConnection, Client, };
 //actix web
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 
@@ -60,16 +60,23 @@ impl ChampionsInfo {
   }
 }
 
+struct RedisData {
+  people: Vec<SummonerYouPlayedWithInfo>
+}
+
+
 
 #[get("/")]
 async fn hello() -> impl Responder {
   HttpResponse::Ok().body("Hewwo wowld!")
 }
 
-#[post("/api/synergies")]
+#[post("/api/NA/synergies")]
 async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Responder {
   dotenv().ok();
   let api_key = env::var("API_KEY").unwrap();
+
+
 
   //get puuid
   let url = format!("https://na1.api.riotgames.com/lol/summoner/v4/summoners/by-name/{}?api_key={}", &synergiespostdata.0.username, api_key);
@@ -154,10 +161,15 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Resp
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-
+  let client = redis::Client::open("redis://127.0.0.1")?;
+  let mut con = client.get_connection()?;
 
     HttpServer::new(move || {
+      let cors = Cors::permissive();
+          
       App::new()
+          .app_data(con)
+          .wrap(cors)
           .service(hello)
           .service(synergies)
     })
