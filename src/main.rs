@@ -6,7 +6,6 @@ use std::env;
 use serde::{Deserialize, Serialize}; 
 use reqwest::Client;
 use actix_cors::Cors;
-use redis::{Commands, aio::MultiplexedConnection, Client, };
 //actix web
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 
