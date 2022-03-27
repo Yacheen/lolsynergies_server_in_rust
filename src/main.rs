@@ -60,11 +60,6 @@ impl ChampionsInfo {
   }
 }
 
-struct RedisData {
-  people: Vec<SummonerYouPlayedWithInfo>
-}
-
-
 
 #[get("/")]
 async fn hello() -> impl Responder {
@@ -161,14 +156,11 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Resp
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-  let client = redis::Client::open("redis://127.0.0.1")?;
-  let mut con = client.get_connection()?;
 
     HttpServer::new(move || {
       let cors = Cors::permissive();
           
       App::new()
-          .app_data(con)
           .wrap(cors)
           .service(hello)
           .service(synergies)
