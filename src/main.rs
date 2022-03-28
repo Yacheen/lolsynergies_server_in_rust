@@ -23,9 +23,10 @@ struct SynergiesPostBody {
 #[derive(Debug)]
 #[derive(Deserialize)] struct GameInfo {participants: Vec<Participant>}
 #[derive(Debug)]
-#[derive(Deserialize)] struct Participant {championName: String, summonerName: String, win: bool}
+#[derive(Deserialize)] struct Participant {summonerName: String, championName: String, win: bool, teamId: u8}
 
-#[derive(Deserialize, Serialize)] struct Matches {amount_of_games: u8, games: Vec<SummonerYouPlayedWithInfo>}
+//CHANGE THIS 
+#[derive(Deserialize, Serialize)] struct Matches {amount_of_games: u8, games: SummonerYouPlayedWithInfo}
 impl Matches {
   fn new() -> Matches {
     Matches {
@@ -38,23 +39,24 @@ impl Matches {
 
 
 #[derive(Serialize, Debug, Deserialize)]
-struct SummonerYouPlayedWithInfo { summonerName: String, champions: Vec<ChampionsInfo> }
+struct SummonerYouPlayedWithInfo { your_team: Vec<ChampionsInfo>, enemy_team: Vec<ChampionsInfo> }
 impl SummonerYouPlayedWithInfo {
-  fn new(summonerName: String, champions: Vec<ChampionsInfo>) -> SummonerYouPlayedWithInfo {
+  fn new(your_team: Vec<ChampionsInfo>, enemy_team: Vec<ChampionsInfo>) -> SummonerYouPlayedWithInfo {
     SummonerYouPlayedWithInfo {
-      summonerName,
-      champions
+      your_team,
+      enemy_team
     }
   }
 }
 #[derive(Serialize, Debug, Deserialize)]
-struct ChampionsInfo { championName: String, wins: u8, losses: u8 }
+struct ChampionsInfo { championName: String, wins: u8, losses: u8, teamId: u8 }
 impl ChampionsInfo {
-  fn new(championName: String, wins: u8, losses: u8) -> ChampionsInfo {
+  fn new(championName: String, wins: u8, losses: u8, teamId: u8) -> ChampionsInfo {
     ChampionsInfo {
       championName,
       wins,
-      losses
+      losses,
+      teamId
     }
   }
 }
@@ -103,12 +105,53 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Resp
           match game {
             Ok(game) =>  {
               match_data.amount_of_games += 1;
+              //get user_teamId somehow here
+              let user_teamId: u8 = game.info.participants.iter().find(|person| {
+                if person.summonerName == synergiespostdata.0.username {
+                  return person.teamId
+                }
+                else {
+                  return ()
+                }
+                
+                
+              });
+              
               for person in game.info.participants.iter() {
-              if let Some(summ) = match_data.games.iter_mut().find(|summ| summ.summonerName == person.summonerName) {
+              //change all logic to:
+               //you have champs you played with on your team and the enemy team
+               //add win/loss of the champ to your_team if personId == selfId, otherwise add win/loss to enemy_team
+
+                if let 100 = person.teamId {
+                  //find a champ, if it destructures into a champ, add a win or loss, otherwise push a new champ
+                  if let Some(champ) = match_data.games.your_team.iter_mut().find(|champ| champ.championName == person.championName) {
+                    if let true = person.win { champ.wins += 1; } else { champ.losses += 1; }
+                  }
+                  else {
+                    match_data.games.your_team.push(ChampionsInfo::new(
+                      person.championName.to_string(),
+                      if person.win == true {1} else {0},
+                      if person.win == true {0} else {1},
+                      person.teamId
+                    ))
+                  }
+                }
+                else {
+                  //go through enemy team
+
+                }
+
+
+
+
+
+                //previous syntax
+                if let Some(summ) = match_data.games.iter_mut().find(|summ| summ.summonerName == person.summonerName) {
                 if let Some(champ) = summ.champions.iter_mut().find(|champ| champ.championName == person.championName) {
                   if let true = person.win { champ.wins += 1; } else { champ.losses += 1; }
                   
                   } else {
+                    //determine which team to push to by teamId
                     summ.champions.push(ChampionsInfo::new(
                       person.championName.to_string(),
                       if person.win == true {1} else {0},
