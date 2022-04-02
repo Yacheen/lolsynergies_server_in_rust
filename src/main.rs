@@ -8,7 +8,8 @@ use reqwest::Client;
 use actix_cors::Cors;
 //actix web
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
-
+//use other files
+mod utils;
 
 #[derive(Deserialize)]
 struct SynergiesPostBody {
@@ -69,7 +70,7 @@ async fn hello() -> impl Responder {
 }
 
 #[post("/api/NA/synergies")]
-async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Responder {
+async fn synergies(mut synergiespostdata: web::Json<SynergiesPostBody>) -> impl Responder {
   dotenv().ok();
   let api_key = env::var("API_KEY").unwrap();
 
@@ -125,7 +126,8 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Resp
 
               for person in game.info.participants.iter() {
                 //if person is on your team, add to your_team, otherwise add to enemy_team
-                if person.summonerName.trim_start().trim_end().to_lowercase() == synergiespostdata.0.username.trim_start().trim_end().to_lowercase() {
+                let mut username = person.summonerName.clone();
+                if utils::parse_username(&mut username) == utils::parse_username(&mut synergiespostdata.0.username) {
                   continue;
                 }
                 else {
