@@ -23,7 +23,7 @@ struct SynergiesPostBody {
 #[derive(Debug)]
 #[derive(Deserialize)] struct GameInfo {participants: Vec<Participant>}
 #[derive(Debug)]
-#[derive(Deserialize)] struct Participant {summonerName: String, championName: String, win: bool, teamId: u8}
+#[derive(Deserialize)] struct Participant {summonerName: String, championName: String, win: bool, teamId: u8, puuid: String}
 
 //CHANGE THIS 
 #[derive(Deserialize, Serialize)] struct Matches {amount_of_games: u8, games: Winrates}
@@ -78,7 +78,12 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Resp
   //get puuid
   let url = format!("https://na1.api.riotgames.com/lol/summoner/v4/summoners/by-name/{}?api_key={}", &synergiespostdata.0.username, api_key);
   if let Ok(summoner) =  reqwest::get(url).await.unwrap().json::<Summoner>().await {
-    let matches_url = format!("https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}&count=50", summoner.puuid, api_key);
+     //make 3 simultaneous requests here for ranked 5v5, normal draft 5v5, and normal blind 5v5
+    //get 5v5 ranke matches
+    let matches_url = format!("https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}&count=75", summoner.puuid, api_key);
+    //get 5v5 draft matches
+    //get 5v5 blind matches
+
     if let Ok(match_ids) = reqwest::get(matches_url).await.unwrap().json::<Vec<MatchIds>>().await {
        //push game urls to a vec
       let mut match_data = Matches::new();
@@ -113,14 +118,14 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Resp
               // get users team_id
               let mut user_team_id: u8 = 0;
               for person in game.info.participants.iter() {
-                if person.summonerName == synergiespostdata.0.username {
-                  user_team_id = person.teamId
+                if person.puuid == summoner.puuid {
+                  user_team_id = person.teamId;
                 }
               }
 
               for person in game.info.participants.iter() {
                 //if person is on your team, add to your_team, otherwise add to enemy_team
-                if person.summonerName == synergiespostdata.0.username {
+                if person.summonerName.trim_start().trim_end().to_lowercase() == synergiespostdata.0.username.trim_start().trim_end().to_lowercase() {
                   continue;
                 }
                 else {
