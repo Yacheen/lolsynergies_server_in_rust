@@ -120,33 +120,39 @@ async fn synergies(synergiespostdata: web::Json<SynergiesPostBody>) -> impl Resp
 
               for person in game.info.participants.iter() {
                 //if person is on your team, add to your_team, otherwise add to enemy_team
-                if user_team_id == person.teamId {
-                  //find a champ, if it destructures into a champ, add a win or loss, otherwise push a new champ
-                  if let Some(champ) = match_data.games.your_team.iter_mut().find(|champ| champ.championName == person.championName) {
-                    if let true = person.win { champ.wins += 1; } else { champ.losses += 1; }
-                  }
-                  else {
-                    match_data.games.your_team.push(ChampionsInfo::new(
-                      person.championName.to_string(),
-                      if person.win == true {1} else {0},
-                      if person.win == true {0} else {1},
-                      person.teamId
-                    ))
-                  }
+                if person.summonerName == synergiespostdata.0.username {
+                  continue;
                 }
                 else {
-                  //go through enemy team for whether to psuh a new champ or edit one
-                  if let Some(champ) = match_data.games.enemy_team.iter_mut().find(|champ| champ.championName == person.championName) {
-                    if let true = person.win { champ.wins += 1; } else { champ.losses += 1; }
+                  if user_team_id == person.teamId {
+                    //find a champ, if it destructures into a champ, add a win or loss, otherwise push a new champ
+                    if let Some(champ) = match_data.games.your_team.iter_mut().find(|champ| champ.championName == person.championName) {
+                      if let true = person.win { champ.wins += 1; } else { champ.losses += 1; }
+                    }
+                    else {
+                      match_data.games.your_team.push(ChampionsInfo::new(
+                        person.championName.to_string(),
+                        if person.win == true {1} else {0},
+                        if person.win == true {0} else {1},
+                        person.teamId
+                      ))
+                    }
                   }
                   else {
-                    match_data.games.enemy_team.push(ChampionsInfo::new(
-                      person.championName.to_string(),
-                      if person.win == true {1} else {0},
-                      if person.win == true {0} else {1},
-                      person.teamId
-                    ));
+                    //go through enemy team for whether to psuh a new champ or edit one
+                    if let Some(champ) = match_data.games.enemy_team.iter_mut().find(|champ| champ.championName == person.championName) {
+                      if let true = person.win { champ.wins += 1; } else { champ.losses += 1; }
+                    }
+                    else {
+                      match_data.games.enemy_team.push(ChampionsInfo::new(
+                        person.championName.to_string(),
+                        if person.win == true {1} else {0},
+                        if person.win == true {0} else {1},
+                        person.teamId
+                      ));
+                    }
                   }
+
                 }
             }
           },
