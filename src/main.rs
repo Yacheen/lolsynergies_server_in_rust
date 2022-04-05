@@ -75,14 +75,14 @@ async fn hello() -> impl Responder {
 async fn synergies(mut synergiespostdata: web::Json<SynergiesPostBody>) -> impl Responder {
   dotenv().ok();
   let api_key = env::var("API_KEY").unwrap();
-  println!("platform:{} region:{} {}", synergiespostdata.0.platform_routing_value, synergiespostdata.0.regional_routing_value, synergiespostdata.0.username);
   //get puuid
-  let url = format!("https://{}.api.riotgames.com/lol/summoner/v4/summoners/by-name/{}?api_key={}", &synergiespostdata.0.platform_routing_value ,&synergiespostdata.0.username, api_key);
+  let url = format!("https://{}.api.riotgames.com/lol/summoner/v4/summoners/by-name/{}?api_key={}", &synergiespostdata.0.platform_routing_value, &synergiespostdata.0.username, api_key);
   if let Ok(summoner) =  reqwest::get(url).await.unwrap().json::<Summoner>().await {
     //make 3 simultaneous requests here for ranked 5v5, normal draft 5v5, and normal blind 5v5
 
     //get 5v5 ranke matches
-    let matches_url = format!("https://{}.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}&count=75",synergiespostdata.0.regional_routing_value, summoner.puuid, api_key);
+    let queue: i16 = 420;
+    let matches_url = format!("https://{}.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}&count=75&queue={}",synergiespostdata.0.regional_routing_value, summoner.puuid, api_key, queue);
     //get 5v5 draft matches
     //get 5v5 blind matches
 
@@ -90,11 +90,11 @@ async fn synergies(mut synergiespostdata: web::Json<SynergiesPostBody>) -> impl 
        //push game urls to a vec
       let mut match_data = Matches::new();
       let mut game_urls = Vec::new();
+
       for item in match_ids.iter() {
         game_urls.push(format!("https://{}.api.riotgames.com/lol/match/v5/matches/{}?api_key={}", synergiespostdata.0.regional_routing_value, item.0, api_key));
       } 
-    
-      //with a max of 3 concurrent requests,
+      //with a max of 4 concurrent requests,
       const CONCURRENT_REQUESTS: usize = 4;
       let client = Client::new();
   
@@ -167,7 +167,7 @@ async fn synergies(mut synergiespostdata: web::Json<SynergiesPostBody>) -> impl 
             Err(_) => break
           }
         }
-        
+        println!("games sent to client: {}", match_data.amount_of_games);
         web::Json(match_data)
 
     } else {
