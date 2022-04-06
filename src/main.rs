@@ -1,11 +1,16 @@
 
 //serde and env var stuff
-use futures::{stream, StreamExt};
+use futures::{stream, StreamExt, Future};
 use dotenv::dotenv;
-use std::env;
+use std::{ env, error::Error, time::{SystemTime, Duration}};
 use serde::{Deserialize, Serialize}; 
 use reqwest::Client;
 use actix_cors::Cors;
+//db
+use mongodb::{options::{ClientOptions, ResolverConfig}};
+use mongodb::bson::doc;
+use bson::to_bson;
+use chrono::{TimeZone, Utc};
 //actix web
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 //use other files
@@ -24,17 +29,19 @@ struct SynergiesPostBody {
 #[derive(Debug)]
 #[derive(Deserialize)] struct Game { info: GameInfo }
 #[derive(Debug)]
-#[derive(Deserialize)] struct GameInfo {participants: Vec<Participant>}
+#[derive(Deserialize)] struct GameInfo { gameCreation: u64, participants: Vec<Participant> }
 #[derive(Debug)]
 #[derive(Deserialize)] struct Participant {summonerName: String, championName: String, win: bool, teamId: u8, puuid: String}
 
 //CHANGE THIS 
-#[derive(Deserialize, Serialize)] struct Matches {amount_of_games: u8, games: Winrates}
+#[derive(Deserialize, Serialize)] struct Matches {amount_of_games: u8, last_updated: Duration, games: Winrates}
 impl Matches {
   fn new() -> Matches {
     let games = Winrates { your_team: Vec::new(), enemy_team: Vec::new() };
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
     Matches {
       amount_of_games: 0,
+      last_updated: now,
       games
     }
   }
@@ -67,14 +74,45 @@ impl ChampionsInfo {
 
 
 #[get("/")]
-async fn hello() -> impl Responder {
-  HttpResponse::Ok().body("Hewwo wowld!")
+async fn hello() -> Result<impl Responder, Box<dyn Error>> {
+  dotenv().ok();
+  let client_uri = env::var("MONGODB_URI").expect("You must set the MONGODB_URI environment var!");
+  // A Client is needed to connect to MongoDB:
+  // An extra line of code to work around a DNS issue on Windows:
+  let options = ClientOptions::parse_with_resolver_config(client_uri, ResolverConfig::cloudflare())
+  .await?;
+
+  let client = mongodb::Client::with_options(options)?;
+  // Print the databases in our MongoDB cluster:
+  let summoners_collection: mongodb::Collection<ChampionsInfo> = client.database("myFirstDatabase").collection("summoners");
+  
+  let games = summoners_collection.find(None, None).await?;
+  //figure out how to iterate through this mongodb cursor stuff
+
+
+  Ok(HttpResponse::Ok())
 }
 
 #[post("/api/synergies")]
-async fn synergies(mut synergiespostdata: web::Json<SynergiesPostBody>) -> impl Responder {
+async fn synergies(mut synergiespostdata: web::Json<SynergiesPostBody>) -> Result<impl Responder, Box<dyn Error>> {
+  //setup env vars
   dotenv().ok();
-  let api_key = env::var("API_KEY").unwrap();
+  let api_key = env::var("API_KEY")?;
+  println!("{}", api_key);
+  // let client_uri = env::var("MONGODB_URI").expect("You must set the MONGODB_URI environment var!");
+  
+  // // A Cli ent is needed to connect to MongoDB:
+  // // An extra line of code to work around a DNS issue on Windows:
+  // let options = ClientOptions::parse_with_resolver_config(client_uri, ResolverConfig::cloudflare())
+  // .await?;
+
+  // let client = mongodb::Client::with_options(options)?;
+  // // Print the databases in our MongoDB cluster:
+  // println!("Databases:");
+  // for name in client.list_database_names(None, None).await? {
+  //   println!("- {}", name);
+  // }
+
   //get puuid
   let url = format!("https://{}.api.riotgames.com/lol/summoner/v4/summoners/by-name/{}?api_key={}", &synergiespostdata.0.platform_routing_value, &synergiespostdata.0.username, api_key);
   if let Ok(summoner) =  reqwest::get(url).await.unwrap().json::<Summoner>().await {
@@ -87,9 +125,13 @@ async fn synergies(mut synergiespostdata: web::Json<SynergiesPostBody>) -> impl 
     //get 5v5 blind matches
 
     if let Ok(match_ids) = reqwest::get(matches_url).await.unwrap().json::<Vec<MatchIds>>().await {
+     
        //push game urls to a vec
       let mut match_data = Matches::new();
+      let last_updated = SystemTime::UNIX_EPOCH;
+      println!("{:#?}", last_updated);
       let mut game_urls = Vec::new();
+      
 
       for item in match_ids.iter() {
         game_urls.push(format!("https://{}.api.riotgames.com/lol/match/v5/matches/{}?api_key={}", synergiespostdata.0.regional_routing_value, item.0, api_key));
@@ -116,6 +158,7 @@ async fn synergies(mut synergiespostdata: web::Json<SynergiesPostBody>) -> impl 
           match game {
             Ok(game) =>  {
               match_data.amount_of_games += 1;
+              println!("{}", match_data.amount_of_games);
               
               // get users team_id
               let mut user_team_id: u8 = 0;
@@ -168,16 +211,16 @@ async fn synergies(mut synergiespostdata: web::Json<SynergiesPostBody>) -> impl 
           }
         }
         println!("games sent to client: {}", match_data.amount_of_games);
-        web::Json(match_data)
+        Ok(web::Json(match_data))
 
     } else {
       let no_games_found = Matches::new();
-      web::Json(no_games_found) 
+      Ok(web::Json(no_games_found)) 
     }
 
   } else {
     let no_games_found = Matches::new();
-    web::Json(no_games_found) 
+    Ok(web::Json(no_games_found)) 
   }
 }
 
