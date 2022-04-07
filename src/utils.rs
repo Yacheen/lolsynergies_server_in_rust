@@ -1,25 +1,5 @@
-use dotenv::dotenv;
-use std::{ env, error::Error };
-//db
-use mongodb::{options::{ClientOptions, ResolverConfig}, bson::doc};
-//actix web
-//stuff from main.rs
-use crate::Matches;
+
 
 pub fn parse_username(s: &mut String) -> String {
     s.trim_start().trim_end().to_lowercase().chars().filter(|c| !c.is_whitespace()).collect::<String>()
-}
-
-pub async fn check_db(username: &String) -> Result<Option<Matches>, Box<dyn Error>> {
-    dotenv().ok();
-    let client_uri = env::var("MONGODB_URI").expect("You must set the MONGODB_URI environment var!");
-    let connection_options = ClientOptions::parse_with_resolver_config(client_uri, ResolverConfig::cloudflare()).await?;
-    let client = mongodb::Client::with_options(connection_options)?;
-
-    let summoners_collection:mongodb::Collection<Matches> = client.database("myFirstDatabase").collection("summoners");
-
-    let games = summoners_collection.find_one(doc! {"username": username}
-        , None).await?;
-    
-    Ok(games)
 }
