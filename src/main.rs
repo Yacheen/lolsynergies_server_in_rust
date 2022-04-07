@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use reqwest::Client;
 use actix_cors::Cors;
 //db
-use mongodb::{bson::doc, options::{ResolverConfig, ClientOptions}};
+use mongodb::{bson::{to_bson, doc}, options::{ResolverConfig, ClientOptions}};
 //actix web
 use actix_web::{get, post, web, App, HttpServer, Responder};
 //use other files
@@ -74,14 +74,15 @@ pub struct ChampionsInfo { championName: String, wins: u8, losses: u8, teamId: u
 
 #[post("/api/synergies")]
 async fn synergies(client: web::Data<mongodb::Client>, mut synergiespostdata: web::Json<SynergiesPostBody>) -> Result<impl Responder, Box<dyn Error>> {
-  //setup env vars
+  //env vars/data initialization
   dotenv().ok();
   let api_key = env::var("API_KEY")?;
-  
   let summoners_collection: mongodb::Collection<Matches> = client.database(DB_NAME).collection(COLL_NAME);
   let result = summoners_collection.find_one(doc! {"username": &synergiespostdata.0.username} , None).await?;
+
+  //if games are received by username, send to frontend, else, hit riot api for 75 games and send to frontend
   match result {
-    Some(summ) => Ok(web::Json(summ)),
+    Some(summoners_synergies) => Ok(web::Json(summoners_synergies)),
     None => {
       //hit rito db for 75 games if its their first time
       //get puuid
@@ -99,11 +100,12 @@ async fn synergies(client: web::Data<mongodb::Client>, mut synergiespostdata: we
         
           //push game urls to a vec
           let mut match_data = Matches::new();
+          let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
+          match_data.last_updated = now;
           
-          let last_updated = SystemTime::UNIX_EPOCH;
-          println!("{:#?}", last_updated);
+          match_data.username = synergiespostdata.0.username.clone();
+ 
           let mut game_urls = Vec::new();
-          
 
           for item in match_ids.iter() {
             game_urls.push(format!("https://{}.api.riotgames.com/lol/match/v5/matches/{}?api_key={}", synergiespostdata.0.regional_routing_value, item.0, api_key));
@@ -182,12 +184,15 @@ async fn synergies(client: web::Data<mongodb::Client>, mut synergiespostdata: we
                 Err(_) => break
               }
             }
+            
+            let insert_result = summoners_collection.insert_one(&match_data, None).await?;
+            println!("added person and their games to db: {:#?}", insert_result);
             println!("games sent to client: {}", match_data.amount_of_games);
             Ok(web::Json(match_data))
 
         } else {
           let no_games_found = Matches::new();
-          Ok(web::Json(no_games_found)) 
+          Ok(web::Json(no_games_found))
         }
 
       } else {
@@ -203,7 +208,7 @@ async fn synergies(client: web::Data<mongodb::Client>, mut synergiespostdata: we
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
   dotenv().ok();
-  
+
   //initialize database 
   let mongodb_uri = env::var("MONGODB_URI").unwrap();
   let connection_options = ClientOptions::parse_with_resolver_config(mongodb_uri, ResolverConfig::cloudflare()).await.expect("Failed to create connection options with cloudfare...");
