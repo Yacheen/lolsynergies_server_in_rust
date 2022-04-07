@@ -70,18 +70,14 @@ pub struct ChampionsInfo { championName: String, wins: u8, losses: u8, teamId: u
   }
 }
 
-#[get("/api/check_db")]
-async fn check_db_for_user() -> Result<impl Responder, Box<dyn Error>> {
-  let something = utils::check_db().await?;
-  Ok(web::Json(something))
-}
-
 #[post("/api/synergies")]
 async fn synergies(mut synergiespostdata: web::Json<SynergiesPostBody>) -> Result<impl Responder, Box<dyn Error>> {
+  
   //setup env vars
   dotenv().ok();
   let api_key = env::var("API_KEY")?;
- 
+  let client_uri = env::var("MONGODB_URI").expect("You must set the MONGODB_URI environment var!");
+
   //hit rito db for 75 games if its their first time
   //get puuid
   let url = format!("https://{}.api.riotgames.com/lol/summoner/v4/summoners/by-name/{}?api_key={}", &synergiespostdata.0.platform_routing_value, &synergiespostdata.0.username, api_key);
