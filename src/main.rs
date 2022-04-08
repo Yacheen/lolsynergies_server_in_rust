@@ -82,30 +82,25 @@ async fn synergies(client: web::Data<mongodb::Client>, mut synergiespostdata: we
 
   //if games are received by username, send to frontend, else, hit riot api for 75 games and send to frontend
   match result {
-    Some(summoners_synergies) => Ok(web::Json(summoners_synergies)),
-    None => {
-      //hit rito db for 75 games if its their first time
-      //get puuid
-     
-            
-            let insert_result = summoners_collection.insert_one(&match_data, None).await?;
-            println!("added person and their games to db: {:#?}", insert_result);
-            println!("games sent to client: {}", match_data.amount_of_games);
-            Ok(web::Json(match_data))
+      Some(summoners_synergies) => Ok(web::Json(summoners_synergies)),
+      None => {
+          //hit rito db for 75 games if its their first time
+          //get puuid
 
-        } else {
-          let no_games_found = Matches::new();
-          Ok(web::Json(no_games_found))
+        if let Some(match_data) = utils::fetch_matches_from_riot_api(synergiespostdata, 75).await {
+
+        }
+        else {
+          
         }
 
-      } else {
-        let no_games_found = Matches::new();
-        Ok(web::Json(no_games_found)) 
-      }
+          let insert_result = summoners_collection.insert_one(&match_data, None).await?;
+          println!("added person and their games to db: {:#?}", insert_result);
+          println!("games sent to client: {}", match_data.amount_of_games);
+          Ok(web::Json(match_data))
 
-    } 
-  }
-  
+      } 
+  } 
 }
 
 #[actix_web::main]

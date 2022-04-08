@@ -1,9 +1,14 @@
 use crate::{Summoner, MatchIds, Game, GameInfo, Participant, SynergiesPostBody};
+use dotenv::dotenv;
+use std::{env, time::{SystemTime, Duration}};
+use reqwest::Client;
+use actix_web::web;
 
 pub fn parse_username(s: &mut String) -> String {
     s.trim_start().trim_end().to_lowercase().chars().filter(|c| !c.is_whitespace()).collect::<String>()
 }
-pub async fn fetch_matches_from_riot_api(synergiespostdata: SynergiesPostBody, count: u8) -> Option<Vec<Participant>> {
+
+pub async fn fetch_matches_from_riot_api(synergiespostdata: web::Json<SynergiesPostBody>, count: u8) -> Option<Vec<Participant>> {
     dotenv().ok();
     let api_key = env::var("API_KEY").unwrap();
 
@@ -13,7 +18,7 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: SynergiesPostBody, c
             
         //get 5v5 ranke matches
         let queue: i16 = 420;
-        let matches_url = format!("https://{}.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}&count={}&queue={}",username, summoner.puuid, api_key, count,queue);
+        let matches_url = format!("https://{}.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}&count={}&queue={}", username, summoner.puuid, api_key, count, queue);
         //get 5v5 draft matches
         //get 5v5 blind matches
 
