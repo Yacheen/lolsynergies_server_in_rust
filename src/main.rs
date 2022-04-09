@@ -16,15 +16,15 @@ const DB_NAME: &str = "myFirstDatabase";
 const COLL_NAME: &str = "summoners";
 
 //request body for /api/synergies
-#[derive(Deserialize)] pub struct SynergiesPostBody { username: String, platform_routing_value: String, regional_routing_value: String }
+#[derive(Deserialize, Debug)] pub struct SynergiesPostBody { username: String, platform_routing_value: String, regional_routing_value: String }
 //structs for hitting riot_api
-#[derive(Deserialize)] pub struct Summoner { puuid: String }
+#[derive(Deserialize)] pub struct Summoner { puuid: String, username: String }
 #[derive(Deserialize, Debug)] pub struct MatchIds (String);
-#[derive(Deserialize, Serialize)] pub struct Game { info: GameInfo }
+#[derive(Deserialize, Serialize, Debug)] pub struct Game { info: GameInfo }
 #[derive(Deserialize, Serialize, Debug)] pub struct GameInfo { gameCreation: u64, participants: Vec<Participant> }
 #[derive(Deserialize, Serialize, Debug)] pub struct Participant {summonerName: String, championName: String, win: bool, teamId: u8, puuid: String}
 //format riot data to store in db into this struct:
-#[derive(Deserialize, Serialize)] pub struct RawUserData {username: String, amount_of_games: u8, last_updated: Duration, games: Vec<Game>}
+#[derive(Deserialize, Serialize, Debug)] pub struct RawUserData {username: String, puuid: String, amount_of_games: u8, last_updated: Duration, games: Vec<Game>}
 
 
 //organized data struct for synergies
@@ -66,36 +66,42 @@ const COLL_NAME: &str = "summoners";
 async fn synergies(client: web::Data<mongodb::Client>, synergiespostdata: web::Json<SynergiesPostBody>) -> Result<impl Responder, Box<dyn Error>> {
     //env vars/data initialization
     dotenv().ok();
-    let api_key = env::var("API_KEY")?;
     //check db
     let summoners_collection: mongodb::Collection<RawUserData> = client.database(DB_NAME).collection(COLL_NAME);
     let result = summoners_collection.find_one(doc! {"username": &synergiespostdata.0.username} , None).await?;
-
+    
     //if games are received by username, send to frontend, else, hit riot api for 75 games and send to frontend
+    
     let res = match result {
-        Some(raw_user_data_from_db) => {
+        Some(mut raw_user_data_from_db) => {
+            
             //organize raw_user_data_from_db into SynergyMatches before sending
-            Ok(web::Json(raw_user_data_from_db))
+            let organized_games = utils::organize_games_into_synergies(&mut raw_user_data_from_db);
+            
+            Ok(web::Json(organized_games))
         },
+
         None => {
             //hit rito db for 75 games if its their first time
-            //get puuid
-            if let Some(match_data) = utils::fetch_matches_from_riot_api(&synergiespostdata, 75).await {
+            if let Some(match_data) = utils::fetch_matches_from_riot_api(&synergiespostdata.0, 75).await {
+             
                 //if u can get matches, add them to db,
                 let insert_result = summoners_collection.insert_one(&match_data, None).await?;
                 println!("added person and their games to db: {:#?}", insert_result);
 
                 //organize them, then send to frontend
                 println!("games sent to client: {}", match_data.amount_of_games);
-                Ok(web::Json(match_data))
+                let organized_games = utils::organize_games_into_synergies(&match_data);
+                Ok(web::Json(organized_games))
             }
             else {
                 let username = synergiespostdata.0.username.clone();
-                Ok(web::Json(RawUserData {
+                println!("no matches have been gotten from fetch");
+                Ok(web::Json(SynergyMatches {
                   amount_of_games: 0,
                   username,
-                  last_updated: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap(),
-                  games: Vec::new()
+                  last_updated: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?,
+                  games: Winrates { your_team: Vec::new(), enemy_team: Vec::new() }
                 }))
             }
         } 

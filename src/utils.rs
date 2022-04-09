@@ -1,29 +1,33 @@
-use futures::{stream, StreamExt, Stream};
-use crate::{Summoner, MatchIds, Game, GameInfo, Participant, SynergiesPostBody, RawUserData};
+use futures::{stream, StreamExt};
+use crate::{Summoner, MatchIds, Game, SynergiesPostBody, RawUserData, SynergyMatches, ChampionsInfo};
 use dotenv::dotenv;
-use std::{env, time::{SystemTime, Duration}};
+use std::{env, time::SystemTime};
 use reqwest::Client;
-use actix_web::web;
 
-pub fn parse_username(s: &mut String) -> String {
+pub fn parse_username(s: &String) -> String {
     s.trim_start().trim_end().to_lowercase().chars().filter(|c| !c.is_whitespace()).collect::<String>()
 }
 
-pub async fn fetch_matches_from_riot_api(synergiespostdata: &web::Json<SynergiesPostBody>, count: u8) -> Option<RawUserData> {
+pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, count: u8) -> Option<RawUserData> {
     dotenv().ok();
     let api_key = env::var("API_KEY").unwrap();
-
-    let username = synergiespostdata.0.username.clone();
+    println!("{:#?}", synergiespostdata);
+    let username = synergiespostdata.username.clone();
+    //set puuid after you get it from summoner request
     let mut match_data = RawUserData {
+        username,
+        puuid: String::new(),
         amount_of_games: 0,
         games: Vec::new(),
-        username,
         last_updated: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap()
     };
 
     let url = format!("https://{}.api.riotgames.com/lol/summoner/v4/summoners/by-name/{}?api_key={}", synergiespostdata.platform_routing_value, synergiespostdata.username, api_key);
+    println!("{}", url);
     if let Ok(summoner) =  reqwest::get(url).await.unwrap().json::<Summoner>().await {
-        //make 3 simultaneous requests here for ranked 5v5, normal draft 5v5, and normal blind 5v5
+        println!("got user: {}", summoner.username);
+        //set RawUserData's puuid
+        match_data.puuid = summoner.puuid.clone();
             
         //get 5v5 ranke matches
         let queue: i16 = 420;
@@ -34,8 +38,6 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &web::Json<Synergies
             count,
             queue
         );
-        //get 5v5 draft matches
-        //get 5v5 blind matches
 
         if let Ok(match_ids) = reqwest::get(matches_url).await.unwrap().json::<Vec<MatchIds>>().await {
             //push game urls to a vec
@@ -66,7 +68,6 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &web::Json<Synergies
                     Err(_) => break
                 }
             }
-
         }
         else {
             return None;
@@ -78,45 +79,65 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &web::Json<Synergies
     return Some(match_data);
 }
 
-pub fn organize_games(matches: &mut SynergyMatches) -> &mut SynergyMatches {
-    for (item, index) in matches.games.your_team.iter().enumerate() {
-        println!("hi");
-    }
+//organizes matches for /summoners/[region]/[usrename] on frontend
+pub fn organize_games_into_synergies(raw_data: &RawUserData) -> SynergyMatches {
+    //initialize synergymatches
+    let mut organized_games = SynergyMatches::new();
 
-    let mut user_team_id: u8 = 0;
-    for person in game.info.participants.iter() {
-        if person.puuid == summoner.puuid {
-            user_team_id = person.teamId;
-        }
-    }
-
-    for person in game.info.participants.iter() {
-    //if person is on your team, add to your_team, otherwise add to enemy_team
-        let mut username = person.summonerName.clone();
-        if utils::parse_username(&mut username) == utils::parse_username(&mut synergiespostdata.0.username) {
-            continue;
+    //iterate through raw data's games
+    for games in raw_data.games.iter() {
+        //determine what team the user is on for this game before algo begins
+        let mut user_team_id: u8 = 0;
+        for person in games.info.participants.iter() {
+            if person.puuid ==  raw_data.puuid {
+                user_team_id = person.teamId;
+            }
         }
 
-        else {
-            if user_team_id == person.teamId {
-            //find a champ, if it destructures into a champ, add a win or loss, otherwise push a new champ
-                match_data.games.your_team.push(ChampionsInfo::new(
-                    person.championName.to_string(),
-                    if person.win == true {1} else {0},
-                    if person.win == true {0} else {1},
-                    person.teamId
-                ))
+        //go through people in game
+        for person in games.info.participants.iter() {
+            //if its who ur searching, dont include in synergies, because ur trying to see who u synergize *with*, not you included
+            
+            if parse_username(&person.summonerName) == parse_username(&raw_data.username) {
+                continue;
             }
             else {
-            //go through enemy team for whether to psuh a new champ or edit one
-                match_data.games.enemy_team.push(ChampionsInfo::new(
-                    person.championName.to_string(),
-                    if person.win == true {1} else {0},
-                    if person.win == true {0} else {1},
-                    person.teamId
-                ));
+                //if persons on your team, add to your team
+
+                if user_team_id == person.teamId {
+                     //find a champ, if it destructures into a champ, add a win or loss, otherwise push a new champ
+                    if let Some(champ) = organized_games.games.your_team.iter_mut().find(|champ| champ.championName == person.championName) {
+                        if person.win == true {champ.wins = champ.wins + 1;} else {champ.losses += 1;}
+                    }
+                    else {
+                        organized_games.games.your_team.push(
+                            ChampionsInfo {
+                                championName: person.championName.clone(),
+                                wins: if person.win == true {1} else {0},
+                                losses: if person.win == true {0} else {1},
+                                teamId: person.teamId 
+                            }
+                        )
+                    }
+                }
+                //otherwise add to enemy team
+                else {
+                    if let Some(champ) = organized_games.games.enemy_team.iter_mut().find(|champ| champ.championName == person.championName) {
+                        if person.win == true {champ.wins += 1;} else {champ.losses += 1;}
+                    }
+                    else {
+                        organized_games.games.enemy_team.push(
+                            ChampionsInfo {
+                                championName: person.championName.clone(),
+                                wins: if person.win == true {1} else {0},
+                                losses: if person.win == true {0} else {1},
+                                teamId: person.teamId 
+                            }
+                        )
+                    }
+                }
             }
         }
     }
-    matches
+    organized_games
 }
