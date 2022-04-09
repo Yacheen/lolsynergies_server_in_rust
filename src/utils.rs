@@ -28,11 +28,11 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
         println!("got user: {}", summoner.username);
         //set RawUserData's puuid
         match_data.puuid = summoner.puuid.clone();
-            
+        
         //get 5v5 ranke matches
         let queue: i16 = 420;
         let matches_url = format!("https://{}.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}&count={}&queue={}",
-            synergiespostdata.username,
+            synergiespostdata.platform_routing_value,
             summoner.puuid,
             api_key,
             count,
@@ -40,6 +40,7 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
         );
 
         if let Ok(match_ids) = reqwest::get(matches_url).await.unwrap().json::<Vec<MatchIds>>().await {
+            println!("{:#?}", match_ids);
             //push game urls to a vec
             let mut game_urls = Vec::new();
             for item in match_ids.iter() {
