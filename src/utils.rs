@@ -1,4 +1,5 @@
-use crate::{Summoner, MatchIds, Game, GameInfo, Participant, SynergiesPostBody};
+use futures::{stream, StreamExt, Stream};
+use crate::{Summoner, MatchIds, Game, GameInfo, Participant, SynergiesPostBody, RawUserData};
 use dotenv::dotenv;
 use std::{env, time::{SystemTime, Duration}};
 use reqwest::Client;
@@ -8,9 +9,17 @@ pub fn parse_username(s: &mut String) -> String {
     s.trim_start().trim_end().to_lowercase().chars().filter(|c| !c.is_whitespace()).collect::<String>()
 }
 
-pub async fn fetch_matches_from_riot_api(synergiespostdata: web::Json<SynergiesPostBody>, count: u8) -> Option<Vec<Participant>> {
+pub async fn fetch_matches_from_riot_api(synergiespostdata: &web::Json<SynergiesPostBody>, count: u8) -> Option<RawUserData> {
     dotenv().ok();
     let api_key = env::var("API_KEY").unwrap();
+
+    let username = synergiespostdata.0.username.clone();
+    let mut match_data = RawUserData {
+        amount_of_games: 0,
+        games: Vec::new(),
+        username,
+        last_updated: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap()
+    };
 
     let url = format!("https://{}.api.riotgames.com/lol/summoner/v4/summoners/by-name/{}?api_key={}", synergiespostdata.platform_routing_value, synergiespostdata.username, api_key);
     if let Ok(summoner) =  reqwest::get(url).await.unwrap().json::<Summoner>().await {
@@ -18,22 +27,21 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: web::Json<SynergiesP
             
         //get 5v5 ranke matches
         let queue: i16 = 420;
-        let matches_url = format!("https://{}.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}&count={}&queue={}", username, summoner.puuid, api_key, count, queue);
+        let matches_url = format!("https://{}.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}&count={}&queue={}",
+            synergiespostdata.username,
+            summoner.puuid,
+            api_key,
+            count,
+            queue
+        );
         //get 5v5 draft matches
         //get 5v5 blind matches
 
         if let Ok(match_ids) = reqwest::get(matches_url).await.unwrap().json::<Vec<MatchIds>>().await {
             //push game urls to a vec
-            let mut match_data = Matches::new();
-            let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
-            match_data.last_updated = now;
-            
-            match_data.username = synergiespostdata.0.username.clone();
-
             let mut game_urls = Vec::new();
-
             for item in match_ids.iter() {
-            game_urls.push(format!("https://{}.api.riotgames.com/lol/match/v5/matches/{}?api_key={}", synergiespostdata.0.regional_routing_value, item.0, api_key));
+                game_urls.push(format!("https://{}.api.riotgames.com/lol/match/v5/matches/{}?api_key={}", synergiespostdata.regional_routing_value, item.0, api_key));
             } 
             //with a max of 4 concurrent requests,
             const CONCURRENT_REQUESTS: usize = 4;
@@ -49,27 +57,28 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: web::Json<SynergiesP
             })
             .buffer_unordered(CONCURRENT_REQUESTS);
         
-            //while there are still games left to iterate through,
-            //for each game, get user_teamId
-            //go through each person, if their id is the same, add the champ
-            //they played to your team, otherwise add to enemy team
             while let Some(game) = games.next().await {
                 match game {
                     Ok(game) =>  {
                     match_data.amount_of_games += 1;
-                    println!("{}", match_data.amount_of_games);
-                    
-                    // get users team_id
-                    
+                    match_data.games.push(game);
                     },
                     Err(_) => break
                 }
             }
+
+        }
+        else {
+            return None;
         }
     }
+    else {
+        return None;
+    }
+    return Some(match_data);
 }
 
-pub fn organize_games(matches: &mut Matches) -> &mut Matches {
+pub fn organize_games(matches: &mut SynergyMatches) -> &mut SynergyMatches {
     for (item, index) in matches.games.your_team.iter().enumerate() {
         println!("hi");
     }
