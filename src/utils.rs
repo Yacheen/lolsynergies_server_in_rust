@@ -24,22 +24,24 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
 
     let url = format!("https://{}.api.riotgames.com/lol/summoner/v4/summoners/by-name/{}?api_key={}", synergiespostdata.platform_routing_value, synergiespostdata.username, api_key);
     println!("{}", url);
-    if let Ok(summoner) =  reqwest::get(url).await.unwrap().json::<Summoner>().await {
-        println!("got user: {}", summoner.username);
+
+    let client = Client::new();
+    if let Ok(summoner) =  client.get(url).send().await.unwrap().json::<Summoner>().await {
         //set RawUserData's puuid
+        println!("got user: {:#?}", summoner);
         match_data.puuid = summoner.puuid.clone();
         
         //get 5v5 ranke matches
         let queue: i16 = 420;
         let matches_url = format!("https://{}.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}&count={}&queue={}",
-            synergiespostdata.platform_routing_value,
+            synergiespostdata.regional_routing_value,
             summoner.puuid,
             api_key,
             count,
             queue
         );
-
-        if let Ok(match_ids) = reqwest::get(matches_url).await.unwrap().json::<Vec<MatchIds>>().await {
+ 
+        if let Ok(match_ids) = client.get(matches_url).send().await.unwrap().json::<Vec<MatchIds>>().await {
             println!("{:#?}", match_ids);
             //push game urls to a vec
             let mut game_urls = Vec::new();
@@ -48,7 +50,7 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
             } 
             //with a max of 4 concurrent requests,
             const CONCURRENT_REQUESTS: usize = 4;
-            let client = Client::new();
+            
         
             let mut games = stream::iter(game_urls)
             .map(|url| {
@@ -61,6 +63,7 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
             .buffer_unordered(CONCURRENT_REQUESTS);
         
             while let Some(game) = games.next().await {
+                match_data.amount_of_games += 1;
                 match game {
                     Ok(game) =>  {
                     match_data.amount_of_games += 1;
@@ -75,6 +78,7 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
         }
     }
     else {
+        println!("its not destructuring into Ok");
         return None;
     }
     return Some(match_data);
@@ -84,7 +88,10 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
 pub fn organize_games_into_synergies(raw_data: &RawUserData) -> SynergyMatches {
     //initialize synergymatches
     let mut organized_games = SynergyMatches::new();
+    organized_games.amount_of_games = raw_data.amount_of_games;
+    organized_games.username = raw_data.username.clone();
 
+    
     //iterate through raw data's games
     for games in raw_data.games.iter() {
         //determine what team the user is on for this game before algo begins

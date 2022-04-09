@@ -18,7 +18,7 @@ const COLL_NAME: &str = "summoners";
 //request body for /api/synergies
 #[derive(Deserialize, Debug)] pub struct SynergiesPostBody { username: String, platform_routing_value: String, regional_routing_value: String }
 //structs for hitting riot_api
-#[derive(Deserialize)] pub struct Summoner { puuid: String, username: String }
+#[derive(Deserialize, Debug)] pub struct Summoner { puuid: String, name: String }
 #[derive(Deserialize, Debug)] pub struct MatchIds (String);
 #[derive(Deserialize, Serialize, Debug)] pub struct Game { info: GameInfo }
 #[derive(Deserialize, Serialize, Debug)] pub struct GameInfo { gameCreation: u64, participants: Vec<Participant> }
@@ -77,7 +77,6 @@ async fn synergies(client: web::Data<mongodb::Client>, synergiespostdata: web::J
             
             //organize raw_user_data_from_db into SynergyMatches before sending
             let organized_games = utils::organize_games_into_synergies(&mut raw_user_data_from_db);
-            
             Ok(web::Json(organized_games))
         },
 
