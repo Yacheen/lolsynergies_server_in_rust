@@ -63,7 +63,6 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
             .buffer_unordered(CONCURRENT_REQUESTS);
         
             while let Some(game) = games.next().await {
-                match_data.amount_of_games += 1;
                 match game {
                     Ok(game) =>  {
                     match_data.amount_of_games += 1;
@@ -78,7 +77,6 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
         }
     }
     else {
-        println!("its not destructuring into Ok");
         return None;
     }
     return Some(match_data);

@@ -77,6 +77,7 @@ async fn synergies(client: web::Data<mongodb::Client>, synergiespostdata: web::J
             
             //organize raw_user_data_from_db into SynergyMatches before sending
             let organized_games = utils::organize_games_into_synergies(&mut raw_user_data_from_db);
+            println!("sending games to client from db: {}", organized_games.amount_of_games);
             Ok(web::Json(organized_games))
         },
 
@@ -89,7 +90,7 @@ async fn synergies(client: web::Data<mongodb::Client>, synergiespostdata: web::J
                 println!("added person and their games to db: {:#?}", insert_result);
 
                 //organize them, then send to frontend
-                println!("games sent to client: {}", match_data.amount_of_games);
+                println!("sending games to client from riot api: {}", match_data.amount_of_games);
                 let organized_games = utils::organize_games_into_synergies(&match_data);
                 Ok(web::Json(organized_games))
             }
