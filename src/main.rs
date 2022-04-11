@@ -18,25 +18,27 @@ const COLL_NAME: &str = "summoners";
 //request body for /api/synergies
 #[derive(Deserialize, Debug)] pub struct SynergiesPostBody { username: String, platform_routing_value: String, regional_routing_value: String }
 //structs for hitting riot_api
-#[derive(Deserialize, Debug)] pub struct Summoner { puuid: String, name: String }
+#[derive(Deserialize, Debug)] pub struct Summoner { puuid: String, name: String, profileIconId: i32, summonerLevel: u64 }
 #[derive(Deserialize, Debug)] pub struct MatchIds (String);
 #[derive(Deserialize, Serialize, Debug)] pub struct Game { info: GameInfo }
 #[derive(Deserialize, Serialize, Debug)] pub struct GameInfo { gameCreation: u64, participants: Vec<Participant> }
 #[derive(Deserialize, Serialize, Debug)] pub struct Participant {summonerName: String, championName: String, win: bool, teamId: u8, puuid: String}
 //format riot data to store in db into this struct:
-#[derive(Deserialize, Serialize, Debug)] pub struct RawUserData {username: String, puuid: String, amount_of_games: u8, last_updated: Duration, games: Vec<Game>}
+#[derive(Deserialize, Serialize, Debug)] pub struct RawUserData {username: String, profileIconId: i32, summonerLevel: u64, puuid: String, amount_of_games: u8, last_updated: Duration, games: Vec<Game>}
 
 
 //organized data struct for synergies
-#[derive(Deserialize, Serialize, Debug)] pub struct SynergyMatches {username: String, amount_of_games: u8, last_updated: Duration, games: Winrates}
+#[derive(Deserialize, Serialize, Debug)] pub struct SynergyMatches {username: String, profileIconId: i32, summonerLevel: u64, amount_of_games: u8, last_updated: Duration, games: Winrates}
  impl SynergyMatches {
-  pub fn new() -> SynergyMatches {
+  pub fn new(last_updated: Duration) -> SynergyMatches {
     let games = Winrates { your_team: Vec::new(), enemy_team: Vec::new() };
-    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
     SynergyMatches {
       username: String::new(),
+      //set default league icon here when u can
+      profileIconId: 0,
+      summonerLevel: 0,
       amount_of_games: 0,
-      last_updated: now,
+      last_updated,
       games
     }
   }
@@ -99,6 +101,9 @@ async fn synergies(client: web::Data<mongodb::Client>, synergiespostdata: web::J
                 println!("no matches have been gotten from fetch");
                 Ok(web::Json(SynergyMatches {
                   amount_of_games: 0,
+                  //set default leagueoflegends iconid here when i can
+                  profileIconId: 0,
+                  summonerLevel: 0,
                   username,
                   last_updated: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?,
                   games: Winrates { your_team: Vec::new(), enemy_team: Vec::new() }

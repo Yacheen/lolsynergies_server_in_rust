@@ -11,11 +11,12 @@ pub fn parse_username(s: &String) -> String {
 pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, count: u8) -> Option<RawUserData> {
     dotenv().ok();
     let api_key = env::var("API_KEY").unwrap();
-    println!("{:#?}", synergiespostdata);
     let username = synergiespostdata.username.clone();
     //set puuid after you get it from summoner request
     let mut match_data = RawUserData {
         username,
+        profileIconId: 0,
+        summonerLevel: 0,
         puuid: String::new(),
         amount_of_games: 0,
         games: Vec::new(),
@@ -23,13 +24,14 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
     };
 
     let url = format!("https://{}.api.riotgames.com/lol/summoner/v4/summoners/by-name/{}?api_key={}", synergiespostdata.platform_routing_value, synergiespostdata.username, api_key);
-    println!("{}", url);
 
     let client = Client::new();
     if let Ok(summoner) =  client.get(url).send().await.unwrap().json::<Summoner>().await {
-        //set RawUserData's puuid
-        println!("got user: {:#?}", summoner);
+        //set user's general info
         match_data.puuid = summoner.puuid.clone();
+        match_data.profileIconId = summoner.profileIconId;
+        match_data.summonerLevel = summoner.summonerLevel;
+        match_data.username = summoner.name;
         
         //get 5v5 ranke matches
         let queue: i16 = 420;
@@ -42,7 +44,6 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
         );
  
         if let Ok(match_ids) = client.get(matches_url).send().await.unwrap().json::<Vec<MatchIds>>().await {
-            println!("{:#?}", match_ids);
             //push game urls to a vec
             let mut game_urls = Vec::new();
             for item in match_ids.iter() {
@@ -85,8 +86,11 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
 //organizes matches for /summoners/[region]/[usrename] on frontend
 pub fn organize_games_into_synergies(raw_data: &RawUserData) -> SynergyMatches {
     //initialize synergymatches
-    let mut organized_games = SynergyMatches::new();
+    let mut organized_games = SynergyMatches::new(raw_data.last_updated);
     organized_games.amount_of_games = raw_data.amount_of_games;
+    organized_games.username = raw_data.username.clone();
+    organized_games.profileIconId = raw_data.profileIconId.clone();
+    organized_games.summonerLevel = raw_data.summonerLevel.clone();
     organized_games.username = raw_data.username.clone();
 
     
