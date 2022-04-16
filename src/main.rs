@@ -142,7 +142,7 @@ async fn main() -> std::io::Result<()> {
           .wrap(cors)
           .service(synergies)
     })
-    .bind(("lolsynergies-api", port))?
+    .bind(("https://quiet-cove-13330.herokuapp.com/", port))?
     .run()
     .await
 
