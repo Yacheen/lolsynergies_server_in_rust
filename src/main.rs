@@ -126,7 +126,8 @@ async fn synergies(client: web::Data<mongodb::Client>, synergiespostdata: web::J
 async fn main() -> std::io::Result<()> {
   dotenv().ok();
 
-  //initialize database 
+  //initialize env vars and db
+  let port = env::var("PORT").unwrap().parse::<u16>().unwrap();
   let mongodb_uri = env::var("MONGODB_URI").unwrap();
   let connection_options = ClientOptions::parse_with_resolver_config(mongodb_uri, ResolverConfig::cloudflare()).await.expect("Failed to create connection options with cloudfare...");
   let client = mongodb::Client::with_options(connection_options).expect("Failed to connect to db.");
@@ -141,7 +142,7 @@ async fn main() -> std::io::Result<()> {
           .wrap(cors)
           .service(synergies)
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("lolsynergies-api", port))?
     .run()
     .await
 
