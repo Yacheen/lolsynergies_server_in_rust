@@ -1,5 +1,5 @@
 use futures::{stream, StreamExt};
-use crate::{Summoner, MatchIds, Game, SynergiesPostBody, RawUserData, SynergyMatches, ChampionsInfo};
+use crate::{Summoner, MatchIds, Game, SynergiesPostBody, RawUserData, SynergyMatches, ChampionsInfo, RankedEntry};
 use dotenv::dotenv;
 use std::{env, time::SystemTime};
 use reqwest::Client;
@@ -11,66 +11,76 @@ pub fn parse_username(s: &String) -> String {
 pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, count: u8) -> Option<RawUserData> {
     dotenv().ok();
     let api_key = env::var("API_KEY").unwrap();
-    let username = synergiespostdata.username.clone();
+
     //set puuid after you get it from summoner request
     let mut match_data = RawUserData {
-        username,
+        username: String::new(),
         profileIconId: 0,
         summonerLevel: 0,
         puuid: String::new(),
         amount_of_games: 0,
         games: Vec::new(),
-        last_updated: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap()
+        last_updated: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap(),
+        ranked_info: Vec::new()
     };
 
     let url = format!("https://{}.api.riotgames.com/lol/summoner/v4/summoners/by-name/{}?api_key={}", synergiespostdata.platform_routing_value, synergiespostdata.username, api_key);
 
     let client = Client::new();
     if let Ok(summoner) =  client.get(url).send().await.unwrap().json::<Summoner>().await {
-        //set user's general info
-        match_data.puuid = summoner.puuid.clone();
-        match_data.profileIconId = summoner.profileIconId;
-        match_data.summonerLevel = summoner.summonerLevel;
-        match_data.username = summoner.name;
-        
-        //get 5v5 ranke matches
-        let queue: i16 = 420;
-        let matches_url = format!("https://{}.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}&count={}&queue={}",
-            synergiespostdata.regional_routing_value,
-            summoner.puuid,
-            api_key,
-            count,
-            queue
-        );
- 
-        if let Ok(match_ids) = client.get(matches_url).send().await.unwrap().json::<Vec<MatchIds>>().await {
-            //push game urls to a vec
-            let mut game_urls = Vec::new();
-            for item in match_ids.iter() {
-                game_urls.push(format!("https://{}.api.riotgames.com/lol/match/v5/matches/{}?api_key={}", synergiespostdata.regional_routing_value, item.0, api_key));
-            } 
-            //with a max of 4 concurrent requests,
-            const CONCURRENT_REQUESTS: usize = 4;
+        //after getting summoner, use summoner to get league rank info
+        let ranked_url = format!("https://{}.api.riotgames.com/lol/league/v4/entries/by-summoner/{}?api_key={}", synergiespostdata.platform_routing_value, summoner.id, api_key);
+        if let Ok(user_ranked_info) = client.get(ranked_url).send().await.unwrap().json::<Vec<RankedEntry>>().await {
+
+            //set user's general info
+            match_data.puuid = summoner.puuid.clone();
+            match_data.profileIconId = summoner.profileIconId;
+            match_data.summonerLevel = summoner.summonerLevel;
+            match_data.username = parse_username(&summoner.name);
+            match_data.ranked_info = user_ranked_info;
             
-        
-            let mut games = stream::iter(game_urls)
-            .map(|url| {
-                let client = &client;
-                async move {
-                let resp = client.get(url).send().await?;
-                resp.json::<Game>().await
+            //get 5v5 ranked matches
+            let queue: i16 = 420;
+            let matches_url = format!("https://{}.api.riotgames.com/lol/match/v5/matches/by-puuid/{}/ids?api_key={}&count={}&queue={}",
+                synergiespostdata.regional_routing_value,
+                summoner.puuid,
+                api_key,
+                count,
+                queue
+            );
+    
+            if let Ok(match_ids) = client.get(matches_url).send().await.unwrap().json::<Vec<MatchIds>>().await {
+                //push game urls to a vec
+                let mut game_urls = Vec::new();
+                for item in match_ids.iter() {
+                    game_urls.push(format!("https://{}.api.riotgames.com/lol/match/v5/matches/{}?api_key={}", synergiespostdata.regional_routing_value, item.0, api_key));
+                } 
+                //with a max of 4 concurrent requests,
+                const CONCURRENT_REQUESTS: usize = 4;
+                
+            
+                let mut games = stream::iter(game_urls)
+                .map(|url| {
+                    let client = &client;
+                    async move {
+                    let resp = client.get(url).send().await?;
+                    resp.json::<Game>().await
+                    }
+                })
+                .buffer_unordered(CONCURRENT_REQUESTS);
+            
+                while let Some(game) = games.next().await {
+                    match game {
+                        Ok(game) =>  {
+                        match_data.amount_of_games += 1;
+                        match_data.games.push(game);
+                        },
+                        Err(_) => break
+                    }
                 }
-            })
-            .buffer_unordered(CONCURRENT_REQUESTS);
-        
-            while let Some(game) = games.next().await {
-                match game {
-                    Ok(game) =>  {
-                    match_data.amount_of_games += 1;
-                    match_data.games.push(game);
-                    },
-                    Err(_) => break
-                }
+            }
+            else {
+                return None;
             }
         }
         else {
@@ -84,7 +94,7 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
 }
 
 //organizes matches for /summoners/[region]/[usrename] on frontend
-pub fn organize_games_into_synergies(raw_data: &RawUserData) -> SynergyMatches {
+pub fn organize_games_into_synergies(raw_data: RawUserData) -> SynergyMatches {
     //initialize synergymatches
     let mut organized_games = SynergyMatches::new(raw_data.last_updated);
     organized_games.amount_of_games = raw_data.amount_of_games;
@@ -92,6 +102,7 @@ pub fn organize_games_into_synergies(raw_data: &RawUserData) -> SynergyMatches {
     organized_games.profileIconId = raw_data.profileIconId.clone();
     organized_games.summonerLevel = raw_data.summonerLevel.clone();
     organized_games.username = raw_data.username.clone();
+    organized_games.ranked_info =  raw_data.ranked_info;
 
     
     //iterate through raw data's games

@@ -18,17 +18,20 @@ const COLL_NAME: &str = "summoners";
 //request body for /api/synergies
 #[derive(Deserialize, Debug)] pub struct SynergiesPostBody { username: String, platform_routing_value: String, regional_routing_value: String }
 //structs for hitting riot_api
-#[derive(Deserialize, Debug)] pub struct Summoner { puuid: String, name: String, profileIconId: i32, summonerLevel: u64 }
+#[derive(Deserialize, Debug)] pub struct Summoner { puuid: String, name: String, profileIconId: i32, summonerLevel: u64, id: String }
+
+#[derive(Deserialize, Serialize, Debug)] pub struct RankedEntry { queueType: String, tier: String, rank: String , leaguePoints: i32, wins: i32, losses: i32 }
+
 #[derive(Deserialize, Debug)] pub struct MatchIds (String);
 #[derive(Deserialize, Serialize, Debug)] pub struct Game { info: GameInfo }
 #[derive(Deserialize, Serialize, Debug)] pub struct GameInfo { gameCreation: u64, participants: Vec<Participant> }
 #[derive(Deserialize, Serialize, Debug)] pub struct Participant {summonerName: String, championName: String, win: bool, teamId: u8, puuid: String}
 //format riot data to store in db into this struct:
-#[derive(Deserialize, Serialize, Debug)] pub struct RawUserData {username: String, profileIconId: i32, summonerLevel: u64, puuid: String, amount_of_games: u8, last_updated: Duration, games: Vec<Game>}
+#[derive(Deserialize, Serialize, Debug)] pub struct RawUserData { username: String, profileIconId: i32, summonerLevel: u64, puuid: String, amount_of_games: u8, last_updated: Duration, games: Vec<Game>, ranked_info: Vec<RankedEntry>}
 
 
 //organized data struct for synergies
-#[derive(Deserialize, Serialize, Debug)] pub struct SynergyMatches {username: String, profileIconId: i32, summonerLevel: u64, amount_of_games: u8, last_updated: Duration, games: Winrates}
+#[derive(Deserialize, Serialize, Debug)] pub struct SynergyMatches {username: String, profileIconId: i32, summonerLevel: u64, amount_of_games: u8, last_updated: Duration, games: Winrates, ranked_info: Vec<RankedEntry>}
  impl SynergyMatches {
   pub fn new(last_updated: Duration) -> SynergyMatches {
     let games = Winrates { your_team: Vec::new(), enemy_team: Vec::new() };
@@ -39,7 +42,8 @@ const COLL_NAME: &str = "summoners";
       summonerLevel: 0,
       amount_of_games: 0,
       last_updated,
-      games
+      games,
+      ranked_info: Vec::new()
     }
   }
 }
@@ -70,15 +74,15 @@ async fn synergies(client: web::Data<mongodb::Client>, synergiespostdata: web::J
     dotenv().ok();
     //check db
     let summoners_collection: mongodb::Collection<RawUserData> = client.database(DB_NAME).collection(COLL_NAME);
-    let result = summoners_collection.find_one(doc! {"username": &synergiespostdata.0.username} , None).await?;
+    let result = summoners_collection.find_one(doc! {"username": utils::parse_username(&synergiespostdata.0.username)} , None).await?;
     
     //if games are received by username, send to frontend, else, hit riot api for 75 games and send to frontend
     
     let res = match result {
-        Some(mut raw_user_data_from_db) => {
+        Some(raw_user_data_from_db) => {
             
             //organize raw_user_data_from_db into SynergyMatches before sending
-            let organized_games = utils::organize_games_into_synergies(&mut raw_user_data_from_db);
+            let organized_games = utils::organize_games_into_synergies(raw_user_data_from_db);
             println!("sending games to client from db: {}", organized_games.amount_of_games);
             Ok(web::Json(organized_games))
         },
@@ -93,7 +97,7 @@ async fn synergies(client: web::Data<mongodb::Client>, synergiespostdata: web::J
 
                 //organize them, then send to frontend
                 println!("sending games to client from riot api: {}", match_data.amount_of_games);
-                let organized_games = utils::organize_games_into_synergies(&match_data);
+                let organized_games = utils::organize_games_into_synergies(match_data);
                 Ok(web::Json(organized_games))
             }
             else {
@@ -106,7 +110,8 @@ async fn synergies(client: web::Data<mongodb::Client>, synergiespostdata: web::J
                   summonerLevel: 0,
                   username,
                   last_updated: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?,
-                  games: Winrates { your_team: Vec::new(), enemy_team: Vec::new() }
+                  games: Winrates { your_team: Vec::new(), enemy_team: Vec::new() },
+                  ranked_info: Vec::new()
                 }))
             }
         } 
