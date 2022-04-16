@@ -127,7 +127,6 @@ async fn main() -> std::io::Result<()> {
   dotenv().ok();
 
   //initialize env vars and db
-  let port = env::var("PORT").unwrap().parse::<u16>().unwrap();
   let mongodb_uri = env::var("MONGODB_URI").unwrap();
   let connection_options = ClientOptions::parse_with_resolver_config(mongodb_uri, ResolverConfig::cloudflare()).await.expect("Failed to create connection options with cloudfare...");
   let client = mongodb::Client::with_options(connection_options).expect("Failed to connect to db.");
@@ -142,7 +141,7 @@ async fn main() -> std::io::Result<()> {
           .wrap(cors)
           .service(synergies)
     })
-    .bind(("https://quiet-cove-13330.herokuapp.com/", port))?
+    .bind(("0.0.0.0", 8080))?
     .run()
     .await
 
