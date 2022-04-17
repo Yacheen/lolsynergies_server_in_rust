@@ -20,7 +20,15 @@ const COLL_NAME: &str = "summoners";
 //structs for hitting riot_api
 #[derive(Deserialize, Debug)] pub struct Summoner { puuid: String, name: String, profileIconId: i32, summonerLevel: u64, id: String }
 
-#[derive(Deserialize, Serialize, Debug)] pub struct RankedEntry { queueType: String, tier: String, rank: String , leaguePoints: i32, wins: i32, losses: i32 }
+#[derive(Deserialize, Serialize, Debug)] 
+pub struct RankedEntry {
+    queueType: String,
+    tier: Option<String>,
+    rank: Option<String>,
+    leaguePoints: i32,
+    wins: i32,
+    losses: i32
+}
 
 #[derive(Deserialize, Debug)] pub struct MatchIds (String);
 #[derive(Deserialize, Serialize, Debug)] pub struct Game { info: GameInfo }

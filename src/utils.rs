@@ -28,10 +28,11 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
 
     let client = Client::new();
     if let Ok(summoner) =  client.get(url).send().await.unwrap().json::<Summoner>().await {
+        
         //after getting summoner, use summoner to get league rank info
         let ranked_url = format!("https://{}.api.riotgames.com/lol/league/v4/entries/by-summoner/{}?api_key={}", synergiespostdata.platform_routing_value, summoner.id, api_key);
         if let Ok(user_ranked_info) = client.get(ranked_url).send().await.unwrap().json::<Vec<RankedEntry>>().await {
-
+            
             //set user's general info
             match_data.puuid = summoner.puuid.clone();
             match_data.profileIconId = summoner.profileIconId;
