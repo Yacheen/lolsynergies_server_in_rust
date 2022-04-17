@@ -136,9 +136,10 @@ async fn main() -> std::io::Result<()> {
 
   //initialize env vars and db
   let mongodb_uri = env::var("MONGODB_URI").unwrap();
+  let port = env::var("PORT").unwrap();
   let connection_options = ClientOptions::parse_with_resolver_config(mongodb_uri, ResolverConfig::cloudflare()).await.expect("Failed to create connection options with cloudfare...");
   let client = mongodb::Client::with_options(connection_options).expect("Failed to connect to db.");
-
+  
 
     HttpServer::new(move || {
       //initialize cors
@@ -149,7 +150,7 @@ async fn main() -> std::io::Result<()> {
           .wrap(cors)
           .service(synergies)
     })
-    .bind(("0.0.0.0", 8080))?
+    .bind(("0.0.0.0", port.parse().unwrap()))?
     .run()
     .await
 
