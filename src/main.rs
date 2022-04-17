@@ -9,7 +9,7 @@ use actix_cors::Cors;
 //db
 use mongodb::{bson::{to_bson, doc}, options::{ResolverConfig, ClientOptions}};
 //actix web
-use actix_web::{get, post, web, App, HttpServer, Responder, HttpResponseBuilder, HttpResponse, ResponseError};
+use actix_web::{get, post, web, App, HttpServer, Responder, HttpResponseBuilder, HttpResponse, ResponseError, http};
 //use other files
 mod utils;
 const DB_NAME: &str = "myFirstDatabase";
@@ -143,7 +143,12 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
       //initialize cors
-      let cors = Cors::permissive();
+      let cors = Cors::default()
+            .allowed_origin("http://localhost:3000/")
+            .allowed_methods(vec!["GET", "POST", "PUT"])
+            .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT])
+            .allowed_header(http::header::CONTENT_TYPE)
+            .max_age(3600);
           
       App::new()
           .app_data(web::Data::new(client.clone()))    
