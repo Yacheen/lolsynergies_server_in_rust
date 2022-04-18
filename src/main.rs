@@ -144,8 +144,9 @@ async fn main() -> std::io::Result<()> {
       //initialize cors
       let cors = Cors::default()
             .allowed_origin("https://localhost:3000/")
+            .allowed_origin("https://localhost:3000/api/synergies")
             .allowed_methods(vec!["GET", "POST"])
-            .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT, header::CONTENT_TYPE, header::ACCESS_CONTROL_ALLOW_ORIGIN])
+            .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT, header::CONTENT_TYPE])
             .max_age(3600);
           
       App::new()
