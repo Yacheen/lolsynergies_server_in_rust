@@ -147,6 +147,7 @@ async fn main() -> std::io::Result<()> {
             .allowed_methods(vec!["GET", "POST"])
             .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
             .allowed_header(header::CONTENT_TYPE)
+            .allowed_header(header::ACCESS_CONTROL_ALLOW_ORIGIN)
             .max_age(3600);
           
       App::new()
