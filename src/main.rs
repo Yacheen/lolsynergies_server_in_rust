@@ -132,21 +132,19 @@ async fn synergies(client: web::Data<mongodb::Client>, synergiespostdata: web::J
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-  dotenv().ok();
+    dotenv().ok();
 
-  //initialize env vars and db
-  let mongodb_uri = env::var("MONGODB_URI").unwrap();
-  let port = env::var("PORT").unwrap();
-  let connection_options = ClientOptions::parse_with_resolver_config(mongodb_uri, ResolverConfig::cloudflare()).await.expect("Failed to create connection options with cloudfare...");
-  let client = mongodb::Client::with_options(connection_options).expect("Failed to connect to db.");
+    //initialize env vars and db
+    let mongodb_uri = env::var("MONGODB_URI").unwrap();
+    let port = env::var("PORT").unwrap();
+    let connection_options = ClientOptions::parse_with_resolver_config(mongodb_uri, ResolverConfig::cloudflare()).await.expect("Failed to create connection options with cloudfare...");
+    let client = mongodb::Client::with_options(connection_options).expect("Failed to connect to db.");
   
-
     HttpServer::new(move || {
       //initialize cors
       let cors = Cors::default()
             .allowed_origin("http://localhost:3000")
             .allowed_methods(vec!["GET", "POST", "PUT"])
-            .expose_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT, http::header::ACCESS_CONTROL_ALLOW_ORIGIN])
             .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT, http::header::ACCESS_CONTROL_ALLOW_ORIGIN])
             .allowed_header(http::header::CONTENT_TYPE)
             .max_age(3600);
@@ -158,6 +156,8 @@ async fn main() -> std::io::Result<()> {
       })
       .bind(("0.0.0.0", port.parse().unwrap()))?
       .run()
-      .await
+      .await?;
+
+    Ok(())
 
 }
