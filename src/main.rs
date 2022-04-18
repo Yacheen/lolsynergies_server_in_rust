@@ -144,12 +144,10 @@ async fn main() -> std::io::Result<()> {
       //initialize cors
       let cors = Cors::default()
             .allowed_origin("http://localhost:3000/")
-            .allowed_origin("https://localhost:3000/api/synergies")
-            .allowed_origin("https://localhost:3000")
-            .allowed_origin("https://localhost:3000/")
             .allowed_origin("https://quiet-cove-13330.herokuapp.com/")
             .allowed_methods(vec!["GET", "POST"])
-            .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT, header::CONTENT_TYPE])
+            .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
+            .allowed_header(header::CONTENT_TYPE)
             .max_age(3600);
           
       App::new()
