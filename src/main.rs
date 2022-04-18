@@ -152,12 +152,12 @@ async fn main() -> std::io::Result<()> {
             .max_age(3600);
           
       App::new()
+          .wrap(cors)    
           .app_data(web::Data::new(client.clone()))    
-          .wrap(cors)
           .service(synergies)
-    })
-    .bind(("0.0.0.0", port.parse().unwrap()))?
-    .run()
-    .await
+      })
+      .bind(("0.0.0.0", port.parse().unwrap()))?
+      .run()
+      .await
 
 }
