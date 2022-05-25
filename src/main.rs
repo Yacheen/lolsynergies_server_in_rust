@@ -144,8 +144,9 @@ async fn main() -> std::io::Result<()> {
       //initialize cors
       let cors = Cors::default()
             .allowed_origin("http://localhost:3000")
-            .allowed_methods(vec!["GET", "POST"])
-            .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT, header::ACCESS_CONTROL_ALLOW_ORIGIN, header::ACCESS_CONTROL_ALLOW_HEADERS, header::ACCESS_CONTROL_ALLOW_CREDENTIALS])
+            .allowed_header(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+            .allowed_methods(vec!["GET", "POST", "PUT"])
+            .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
             .allowed_header(header::CONTENT_TYPE)
             .max_age(3600);
           
