@@ -146,7 +146,7 @@ async fn main() -> std::io::Result<()> {
             .allowed_origin("http://localhost:3000/")
             .allowed_origin("https://quiet-cove-13330.herokuapp.com/")
             .allowed_methods(vec!["GET", "POST"])
-            .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
+            .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT, header::ACCESS_CONTROL_ALLOW_ORIGIN])
             .allowed_header(header::CONTENT_TYPE)
             .max_age(3600);
           
