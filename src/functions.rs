@@ -1,5 +1,5 @@
 use futures::{stream, StreamExt};
-use crate::{Summoner, MatchIds, Game, SynergiesPostBody, RawUserData, SynergyMatches, ChampionsInfo, RankedEntry};
+use crate::definitions::{Summoner, MatchIds, Game, SynergiesPostBody, RawUserData, SynergyMatches, ChampionsInfo, RankedEntry};
 use dotenv::dotenv;
 use std::{env, time::SystemTime};
 use reqwest::Client;
@@ -15,6 +15,7 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
     //set puuid after you get it from summoner request
     let mut match_data = RawUserData {
         username: String::new(),
+        display_name: None,
         profileIconId: 0,
         summonerLevel: 0,
         puuid: String::new(),
@@ -39,6 +40,7 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
             match_data.summonerLevel = summoner.summonerLevel;
             match_data.username = parse_username(&summoner.name);
             match_data.ranked_info = user_ranked_info;
+            match_data.display_name = Some(summoner.name);
             
             //get 5v5 ranked matches
             let queue: i16 = 420;
@@ -100,6 +102,7 @@ pub fn organize_games_into_synergies(raw_data: RawUserData) -> SynergyMatches {
     let mut organized_games = SynergyMatches::new(raw_data.last_updated);
     organized_games.amount_of_games = raw_data.amount_of_games;
     organized_games.username = raw_data.username.clone();
+    organized_games.display_name = Some(raw_data.display_name.clone().unwrap());
     organized_games.profileIconId = raw_data.profileIconId.clone();
     organized_games.summonerLevel = raw_data.summonerLevel.clone();
     organized_games.username = raw_data.username.clone();
