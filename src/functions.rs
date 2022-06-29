@@ -122,14 +122,13 @@ pub fn organize_games_into_synergies(raw_data: RawUserData) -> SynergyMatches {
         //go through people in game
         for person in games.info.participants.iter() {
             println!("person: {:?}", person);
-            //if its who ur searching, dont include in synergies, because ur trying to see who u synergize *with*, not you included
-            
-            if parse_username(&person.summonerName) == parse_username(&raw_data.username) {
+            // checks if its u, if so, dont include in synergies list
+            if parse_username(&person.puuid) == parse_username(&raw_data.puuid) {
                 continue;
             }
             else {
                 //if persons on your team, add to your team
-
+                // get average of all scores  then put them as synergies
                 if user_team_id == person.teamId {
                      //find a champ, if it destructures into a champ, add a win or loss, otherwise push a new champ
                     if let Some(champ) = organized_games.games.your_team.iter_mut().find(|champ| champ.championName == person.championName) {
