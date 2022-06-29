@@ -29,7 +29,7 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
 
     let client = Client::new();
     if let Ok(summoner) =  client.get(url).send().await.unwrap().json::<Summoner>().await {
-        
+        println!("got summoner: {:?}", summoner);
         //after getting summoner, use summoner to get league rank info
         let ranked_url = format!("https://{}.api.riotgames.com/lol/league/v4/entries/by-summoner/{}?api_key={}", synergiespostdata.platform_routing_value, summoner.id, api_key);
         if let Ok(user_ranked_info) = client.get(ranked_url).send().await.unwrap().json::<Vec<RankedEntry>>().await {
@@ -121,6 +121,7 @@ pub fn organize_games_into_synergies(raw_data: RawUserData) -> SynergyMatches {
 
         //go through people in game
         for person in games.info.participants.iter() {
+            println!("person: {:?}", person);
             //if its who ur searching, dont include in synergies, because ur trying to see who u synergize *with*, not you included
             
             if parse_username(&person.summonerName) == parse_username(&raw_data.username) {
