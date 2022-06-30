@@ -29,7 +29,6 @@ pub async fn fetch_matches_from_riot_api(synergiespostdata: &SynergiesPostBody, 
 
     let client = Client::new();
     if let Ok(summoner) =  client.get(url).send().await.unwrap().json::<Summoner>().await {
-        println!("got summoner: {:?}", summoner);
         //after getting summoner, use summoner to get league rank info
         let ranked_url = format!("https://{}.api.riotgames.com/lol/league/v4/entries/by-summoner/{}?api_key={}", synergiespostdata.platform_routing_value, summoner.id, api_key);
         if let Ok(user_ranked_info) = client.get(ranked_url).send().await.unwrap().json::<Vec<RankedEntry>>().await {
@@ -121,7 +120,6 @@ pub fn organize_games_into_synergies(raw_data: RawUserData) -> SynergyMatches {
 
         //go through people in game
         for person in games.info.participants.iter() {
-            println!("person: {:?}", person);
             // checks if its u, if so, dont include in synergies list
             if parse_username(&person.puuid) == parse_username(&raw_data.puuid) {
                 continue;
@@ -132,7 +130,21 @@ pub fn organize_games_into_synergies(raw_data: RawUserData) -> SynergyMatches {
                 if user_team_id == person.teamId {
                      //find a champ, if it destructures into a champ, add a win or loss, otherwise push a new champ
                     if let Some(champ) = organized_games.games.your_team.iter_mut().find(|champ| champ.championName == person.championName) {
-                        if person.win == true {champ.wins = champ.wins + 1;} else {champ.losses += 1;}
+                        // set new averages
+                        champ.average_assists += person.assists;
+                        champ.average_damage_dealt_to_objectives += person.damageDealtToObjectives;
+                        champ.average_deaths += person.deaths;
+                        champ.average_gold_earned += person.goldEarned;
+                        champ.average_kills += person.kills;
+                        champ.average_total_damage_dealt_to_champions += person.totalDamageDealtToChampions;
+                        champ.average_total_damage_shielded_on_teammates += person.totalDamageShieldedOnTeammates;
+                        champ.average_total_heals_on_teammates += person.totalHealsOnTeammates;
+                        champ.average_total_minions_killed += person.totalMinionsKilled;
+                        champ.average_neutral_minions_killed += person.neutralMinionsKilled;
+                        champ.average_vision_score += person.visionScore; 
+                        if person.win == true { champ.wins = champ.wins + 1; } else { champ.losses += 1; }
+                        
+                        
                     }
                     else {
                         organized_games.games.your_team.push(
@@ -140,7 +152,19 @@ pub fn organize_games_into_synergies(raw_data: RawUserData) -> SynergyMatches {
                                 championName: person.championName.clone(),
                                 wins: if person.win == true {1} else {0},
                                 losses: if person.win == true {0} else {1},
-                                teamId: person.teamId 
+                                teamId: person.teamId,
+                                synergy_score: None,
+                                average_assists: person.assists,
+                                average_damage_dealt_to_objectives: person.damageDealtToObjectives,
+                                average_deaths: person.deaths,
+                                average_gold_earned: person.goldEarned,
+                                average_kills: person.kills,
+                                average_total_damage_dealt_to_champions: person.totalDamageDealtToChampions,
+                                average_total_damage_shielded_on_teammates: person.totalDamageShieldedOnTeammates,
+                                average_total_heals_on_teammates: person.totalHealsOnTeammates,
+                                average_total_minions_killed: person.totalMinionsKilled,
+                                average_neutral_minions_killed: person.neutralMinionsKilled,
+                                average_vision_score: person.visionScore,
                             }
                         )
                     }
@@ -148,6 +172,17 @@ pub fn organize_games_into_synergies(raw_data: RawUserData) -> SynergyMatches {
                 //otherwise add to enemy team
                 else {
                     if let Some(champ) = organized_games.games.enemy_team.iter_mut().find(|champ| champ.championName == person.championName) {
+                        champ.average_assists += person.assists;
+                        champ.average_damage_dealt_to_objectives += person.damageDealtToObjectives;
+                        champ.average_deaths += person.deaths;
+                        champ.average_gold_earned += person.goldEarned;
+                        champ.average_kills += person.kills;
+                        champ.average_total_damage_dealt_to_champions += person.totalDamageDealtToChampions;
+                        champ.average_total_damage_shielded_on_teammates += person.totalDamageShieldedOnTeammates;
+                        champ.average_total_heals_on_teammates += person.totalHealsOnTeammates;
+                        champ.average_total_minions_killed += person.totalMinionsKilled;
+                        champ.average_neutral_minions_killed += person.neutralMinionsKilled;
+                        champ.average_vision_score += person.visionScore; 
                         if person.win == true {champ.wins += 1;} else {champ.losses += 1;}
                     }
                     else {
@@ -156,13 +191,100 @@ pub fn organize_games_into_synergies(raw_data: RawUserData) -> SynergyMatches {
                                 championName: person.championName.clone(),
                                 wins: if person.win == true {1} else {0},
                                 losses: if person.win == true {0} else {1},
-                                teamId: person.teamId 
+                                teamId: person.teamId,
+                                synergy_score: None,
+                                average_assists: person.assists,
+                                average_damage_dealt_to_objectives: person.damageDealtToObjectives,
+                                average_deaths: person.deaths,
+                                average_gold_earned: person.goldEarned,
+                                average_kills: person.kills,
+                                average_total_damage_dealt_to_champions: person.totalDamageDealtToChampions,
+                                average_total_damage_shielded_on_teammates: person.totalDamageShieldedOnTeammates,
+                                average_total_heals_on_teammates: person.totalHealsOnTeammates,
+                                average_total_minions_killed: person.totalMinionsKilled,
+                                average_neutral_minions_killed: person.neutralMinionsKilled,
+                                average_vision_score: person.visionScore,
                             }
                         )
                     }
                 }
             }
         }
+    }
+    // get averages of games
+    organized_games.games.enemy_team.iter_mut().for_each(|champ_stat| {
+        champ_stat.average_assists /= champ_stat.wins + champ_stat.losses;
+        champ_stat.average_damage_dealt_to_objectives /= (champ_stat.wins + champ_stat.losses) as u32;
+        champ_stat.average_deaths /= champ_stat.wins + champ_stat.losses;
+        champ_stat.average_gold_earned /= (champ_stat.wins + champ_stat.losses) as u32;
+        champ_stat.average_kills /= champ_stat.wins + champ_stat.losses;
+        champ_stat.average_total_damage_dealt_to_champions /= (champ_stat.wins + champ_stat.losses) as u32;
+        champ_stat.average_total_damage_shielded_on_teammates /= (champ_stat.wins + champ_stat.losses) as u32;
+        champ_stat.average_total_heals_on_teammates /= (champ_stat.wins + champ_stat.losses) as u32;
+        champ_stat.average_total_minions_killed /= (champ_stat.wins + champ_stat.losses) as u16;
+        champ_stat.average_neutral_minions_killed /= (champ_stat.wins + champ_stat.losses) as u16;
+        champ_stat.average_vision_score /= (champ_stat.wins + champ_stat.losses) as u16;
+        
+    });
+    organized_games.games.your_team.iter_mut().for_each(|champ_stat| {
+        champ_stat.average_assists /= champ_stat.wins + champ_stat.losses;
+        champ_stat.average_damage_dealt_to_objectives /= (champ_stat.wins + champ_stat.losses) as u32;
+        champ_stat.average_deaths /= champ_stat.wins + champ_stat.losses;
+        champ_stat.average_gold_earned /= (champ_stat.wins + champ_stat.losses) as u32;
+        champ_stat.average_kills /= champ_stat.wins + champ_stat.losses;
+        champ_stat.average_total_damage_dealt_to_champions /= (champ_stat.wins + champ_stat.losses) as u32;
+        champ_stat.average_total_damage_shielded_on_teammates /= (champ_stat.wins + champ_stat.losses) as u32;
+        champ_stat.average_total_heals_on_teammates /= (champ_stat.wins + champ_stat.losses) as u32;
+        champ_stat.average_total_minions_killed /= (champ_stat.wins + champ_stat.losses) as u16;
+        champ_stat.average_neutral_minions_killed /= (champ_stat.wins + champ_stat.losses) as u16;
+        champ_stat.average_vision_score /= (champ_stat.wins + champ_stat.losses) as u16;
+        
+    });
+    calculate_synergy_score(&mut organized_games);
+    organized_games
+}
+
+pub fn calculate_synergy_score(organized_games: &mut SynergyMatches) -> &mut SynergyMatches  {
+    for mut champ_stats in organized_games.games.your_team.iter_mut() {
+        champ_stats.synergy_score = Some((champ_stats.average_assists as f32) as f32
+        + (champ_stats.average_damage_dealt_to_objectives / 2000) as f32
+        - (champ_stats.average_deaths) as f32
+        + (champ_stats.average_gold_earned / 1000) as f32
+        + (champ_stats.average_kills) as f32
+        + (champ_stats.average_total_damage_dealt_to_champions / 1500) as f32
+        + (champ_stats.average_total_damage_shielded_on_teammates / 1000) as f32
+        + (champ_stats.average_total_heals_on_teammates / 800) as f32
+        + (champ_stats.average_total_minions_killed / 15) as f32
+        + (champ_stats.average_neutral_minions_killed / 12) as f32
+        + (champ_stats.average_vision_score / 5) as f32 
+        //   pub totalDamageShieldedOnTeammates: u32,
+        //   pub totalHealsOnTeammates: u32,
+        //   pub totalMinionsKilled: u16,
+        //   pub visionScore: u16,
+        - (champ_stats.losses * 10) as f32
+        + (champ_stats.wins * 12) as f32);
+        // more synergy added for how much u played with that champ
+    }
+    for mut champ_stats in organized_games.games.enemy_team.iter_mut() {
+        champ_stats.synergy_score = Some((champ_stats.average_assists as f32) as f32
+        + (champ_stats.average_damage_dealt_to_objectives / 3000) as f32
+        - (champ_stats.average_deaths) as f32
+        + (champ_stats.average_gold_earned / 1000) as f32
+        + (champ_stats.average_kills) as f32
+        + (champ_stats.average_total_damage_dealt_to_champions / 2500) as f32
+        + (champ_stats.average_total_damage_shielded_on_teammates / 1200) as f32
+        + (champ_stats.average_total_heals_on_teammates / 1200) as f32
+        + (champ_stats.average_total_minions_killed / 20) as f32
+        + (champ_stats.average_neutral_minions_killed / 18) as f32
+        + (champ_stats.average_vision_score / 3) as f32 
+        //   pub totalDamageShieldedOnTeammates: u32,
+        //   pub totalHealsOnTeammates: u32,
+        //   pub totalMinionsKilled: u16,
+        //   pub visionScore: u16,
+        - (champ_stats.losses * 14) as f32
+        + (champ_stats.wins * 20 ) as f32
+        // more synergy added for how much u played with that champ
+        + (champ_stats.wins as f32 + champ_stats.losses as f32));
     }
     organized_games
 }
