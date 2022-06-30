@@ -47,7 +47,8 @@ pub struct RankedEntry {
   pub championName: String,
   pub win: bool,
   pub teamId: u8,
-  pub puuid: String
+  pub puuid: String,
+  pub timeCCingOthers: u64,
 
 }
 
@@ -127,4 +128,5 @@ pub struct RankedEntry {
   pub average_total_minions_killed: u16,
   pub average_neutral_minions_killed: u16,
   pub average_vision_score: u16,
+  pub average_time_ccing_others: u64,
 }

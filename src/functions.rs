@@ -142,6 +142,7 @@ pub fn organize_games_into_synergies(raw_data: RawUserData) -> SynergyMatches {
                         champ.average_total_minions_killed += person.totalMinionsKilled;
                         champ.average_neutral_minions_killed += person.neutralMinionsKilled;
                         champ.average_vision_score += person.visionScore; 
+                        champ.average_time_ccing_others += person.timeCCingOthers;
                         if person.win == true { champ.wins = champ.wins + 1; } else { champ.losses += 1; }
                         
                         
@@ -165,6 +166,7 @@ pub fn organize_games_into_synergies(raw_data: RawUserData) -> SynergyMatches {
                                 average_total_minions_killed: person.totalMinionsKilled,
                                 average_neutral_minions_killed: person.neutralMinionsKilled,
                                 average_vision_score: person.visionScore,
+                                average_time_ccing_others: person.timeCCingOthers,
                             }
                         )
                     }
@@ -183,6 +185,7 @@ pub fn organize_games_into_synergies(raw_data: RawUserData) -> SynergyMatches {
                         champ.average_total_minions_killed += person.totalMinionsKilled;
                         champ.average_neutral_minions_killed += person.neutralMinionsKilled;
                         champ.average_vision_score += person.visionScore; 
+                        champ.average_time_ccing_others += person.timeCCingOthers;
                         if person.win == true {champ.wins += 1;} else {champ.losses += 1;}
                     }
                     else {
@@ -204,6 +207,7 @@ pub fn organize_games_into_synergies(raw_data: RawUserData) -> SynergyMatches {
                                 average_total_minions_killed: person.totalMinionsKilled,
                                 average_neutral_minions_killed: person.neutralMinionsKilled,
                                 average_vision_score: person.visionScore,
+                                average_time_ccing_others: person.timeCCingOthers,
                             }
                         )
                     }
@@ -224,6 +228,7 @@ pub fn organize_games_into_synergies(raw_data: RawUserData) -> SynergyMatches {
         champ_stat.average_total_minions_killed /= (champ_stat.wins + champ_stat.losses) as u16;
         champ_stat.average_neutral_minions_killed /= (champ_stat.wins + champ_stat.losses) as u16;
         champ_stat.average_vision_score /= (champ_stat.wins + champ_stat.losses) as u16;
+        champ_stat.average_time_ccing_others /= (champ_stat.wins + champ_stat.losses) as u64;
         
     });
     organized_games.games.your_team.iter_mut().for_each(|champ_stat| {
@@ -238,6 +243,7 @@ pub fn organize_games_into_synergies(raw_data: RawUserData) -> SynergyMatches {
         champ_stat.average_total_minions_killed /= (champ_stat.wins + champ_stat.losses) as u16;
         champ_stat.average_neutral_minions_killed /= (champ_stat.wins + champ_stat.losses) as u16;
         champ_stat.average_vision_score /= (champ_stat.wins + champ_stat.losses) as u16;
+        champ_stat.average_time_ccing_others /= (champ_stat.wins + champ_stat.losses) as u64;
         
     });
     calculate_synergy_score(&mut organized_games);
@@ -260,8 +266,16 @@ pub fn calculate_synergy_score(organized_games: &mut SynergyMatches) -> &mut Syn
         - (champ_stats.losses * 14) as f32
         + (champ_stats.wins * 20) as f32
         // more synergy added for how much u played with that champ
-        + (champ_stats.wins as f32 + champ_stats.losses as f32));
-        // more synergy added for how much u played with that champ
+        + (champ_stats.wins as f32 + champ_stats.losses as f32)
+        + (champ_stats.average_time_ccing_others) as f32);
+
+        // nerf nocturne's synergy score since his time spent ccing is global for all players LMFAO
+        if champ_stats.championName == "Nocturne" {
+            champ_stats.synergy_score = Some(
+                (champ_stats.synergy_score.unwrap() - champ_stats.average_time_ccing_others as f32) + 40.0
+            );
+        }
+
     }
     for mut champ_stats in organized_games.games.enemy_team.iter_mut() {
         champ_stats.synergy_score = Some((champ_stats.average_assists as f32 * 0.5) as f32
@@ -278,7 +292,15 @@ pub fn calculate_synergy_score(organized_games: &mut SynergyMatches) -> &mut Syn
         - (champ_stats.losses * 14) as f32
         + (champ_stats.wins * 20) as f32
         // more synergy added for how much u played with that champ
-        + (champ_stats.wins as f32 + champ_stats.losses as f32));
+        + (champ_stats.wins as f32 + champ_stats.losses as f32)
+        + (champ_stats.average_time_ccing_others) as f32);
+
+        // nerf nocturne's synergy score since his time spent ccing is global for all players LMFAO
+        if champ_stats.championName == "Nocturne" {
+            champ_stats.synergy_score = Some(
+                (champ_stats.synergy_score.unwrap() - champ_stats.average_time_ccing_others as f32) + 40.0
+            );
+        }
     }
     organized_games
 }
