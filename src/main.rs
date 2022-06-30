@@ -20,7 +20,7 @@ async fn synergies(client: web::Data<mongodb::Client>, synergiespostdata: web::J
     //check db
     
     let summoners_collection: mongodb::Collection<definitions::RawUserData> = client.database(DB_NAME).collection(COLL_NAME);
-    println!("your username entered: {}", functions::parse_username(&synergiespostdata.0.username));
+    println!("Username parsed: {}", functions::parse_username(&synergiespostdata.0.username));
     let result = summoners_collection.find_one(doc! {"username": functions::parse_username(&synergiespostdata.0.username)} , None).await.unwrap();
     //if games are received by username, send to frontend, else, hit riot api for 75 games and send to frontend
     let res = match result {
@@ -47,7 +47,7 @@ async fn synergies(client: web::Data<mongodb::Client>, synergiespostdata: web::J
             }
             else {
                 let username = synergiespostdata.0.username.clone();
-                println!("no matches have been gotten from fetch");
+                println!("no matches have been gotten from fetch for user: {}", username);
                 Ok(web::Json(definitions::SynergyMatches {
                   amount_of_games: 0,
                   display_name: None,
