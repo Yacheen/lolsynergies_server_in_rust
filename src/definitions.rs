@@ -32,17 +32,24 @@ pub struct RankedEntry {
 
 #[derive(Deserialize, Serialize, Debug)] pub struct Participant {
   pub champLevel: u16,
-  pub assists: u8,
+  pub assists: u16,
   pub damageDealtToObjectives: u32,
   pub damageSelfMitigated: u32,
-  pub deaths: u8,
+  pub deaths: u16,
   pub goldEarned: u32,
-  pub kills: u8,
+  pub kills: u16,
   pub totalDamageDealtToChampions: u32,
+  pub totalDamageShieldedOnTeammates: u32,
+  pub totalHealsOnTeammates: u32,
+  pub totalMinionsKilled: u16,
+  pub neutralMinionsKilled: u16,
+  pub visionScore: u16,
   pub summonerName: String,
   pub championName: String,
-  pub win: bool, pub teamId: u8,
+  pub win: bool,
+  pub teamId: u8,
   pub puuid: String
+
 }
 
 //format riot data to store in db into this struct:
@@ -104,17 +111,22 @@ pub struct RankedEntry {
 
 #[derive(Serialize, Debug, Deserialize)] pub struct ChampionsInfo { 
   pub championName: String, 
-  pub wins: u8, 
-  pub losses: u8, 
-  pub teamId: u8 
-}
- impl ChampionsInfo {
-  pub fn new(championName: String, wins: u8, losses: u8, teamId: u8) -> ChampionsInfo {
-    ChampionsInfo {
-      championName,
-      wins,
-      losses,
-      teamId
-    }
-  }
+  pub wins: u16, 
+  pub losses: u16, 
+  pub teamId: u8, 
+  // add the stats that determine a synergy, and += them to divide by 2,
+  // at the end, change the option to the score result
+  pub synergy_score: Option<f32>,
+  pub average_assists: u16,
+  pub average_damage_dealt_to_objectives: u32,
+  pub average_damage_self_mitigated: u32,
+  pub average_deaths: u16,
+  pub average_gold_earned: u32,
+  pub average_kills: u16,
+  pub average_total_damage_dealt_to_champions: u32,
+  pub average_total_damage_shielded_on_teammates: u32,
+  pub average_total_heals_on_teammates: u32,
+  pub average_total_minions_killed: u16,
+  pub average_neutral_minions_killed: u16,
+  pub average_vision_score: u16,
 }
