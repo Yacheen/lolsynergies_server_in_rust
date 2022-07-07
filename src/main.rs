@@ -4,7 +4,7 @@ use actix_cors::Cors;
 //db
 use mongodb::{bson::doc, options::{ResolverConfig, ClientOptions}};
 //actix web
-use actix_web::{post, web::{self, Data}, App, HttpServer, Responder, dev::Server};
+use actix_web::{ post, web::{self, Data}, App, HttpServer, Responder };
 //use other files
 mod functions;
 mod definitions;
@@ -49,15 +49,21 @@ async fn synergies(client: Data<mongodb::Client>, server_current_states: Data<Mu
                 Ok(web::Json(organized_games))
             }
             else {
-                let username = synergiespostdata.0.username.clone();
-                println!("no matches have been gotten from fetch for user: {}", username);
+                println!(
+                    "no matches have been gotten from fetch for user: {}, stopping requests for 10 minutes to be allowed to begin requesting again from riot games",
+                    &synergiespostdata.0.username
+                );
+                // tells server to not allow requests to riot api
+                let mut ran_out_of_requests = server_current_states.lock().unwrap();
+                ran_out_of_requests.ran_out_of_requests = true;
+
                 Ok(web::Json(definitions::SynergyMatches {
                   amount_of_games: 0,
                   display_name: None,
                   //set default leagueoflegends iconid here when i can
                   profileIconId: 0,
                   summonerLevel: 0,
-                  username,
+                  username: synergiespostdata.0.username,
                   last_updated: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?,
                   games: definitions::Winrates { your_team: Vec::new(), enemy_team: Vec::new() },
                   ranked_info: Vec::new()
